@@ -188,6 +188,7 @@ const App = (() => {
     const root = document.getElementById('day-selector');
     root.innerHTML = '';
     const todayStr = new Date().toISOString().slice(0, 10);
+    const todayIdx = TRIP.days.findIndex((d) => d.date === todayStr);
 
     TRIP.days.forEach((day, i) => {
       const pill = document.createElement('button');
@@ -199,6 +200,17 @@ const App = (() => {
       pill.addEventListener('click', () => setActiveDay(i));
       root.appendChild(pill);
     });
+
+    // Show "Today" jump button only when not viewing today (and today is in range)
+    const jumpBtn = document.getElementById('jump-today-btn');
+    if (jumpBtn) {
+      if (todayIdx >= 0 && todayIdx !== currentDayIndex) {
+        jumpBtn.classList.remove('hidden');
+        jumpBtn.onclick = () => setActiveDay(todayIdx);
+      } else {
+        jumpBtn.classList.add('hidden');
+      }
+    }
   }
 
   function setActiveDay(i) {
