@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#1a1a2e" />
+  <meta name="description" content="허니문 지중해 크루즈 여행 가이드" />
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="허니문 가이드" />
+
+  <title>허니문 지중해 크루즈 가이드</title>
+
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <!-- Splash / Login -->
+  <div id="login-screen" class="screen">
+    <div class="login-card">
+      <h1>💍 허니문 가이드</h1>
+      <p class="subtitle">바르셀로나 → 마르세유 → 팔레르모 → 로마 → 사보나 → 바르셀로나</p>
+      <p class="info">서로의 일정을 공유하려면 같은 트립 코드를 입력하세요.</p>
+      <label>이름</label>
+      <select id="user-name">
+        <option value="남편">남편</option>
+        <option value="와이프">와이프</option>
+      </select>
+      <label>트립 코드 (둘이 같은 코드)</label>
+      <input id="trip-code" type="text" maxlength="20" placeholder="예: honeymoon2026" value="honeymoon2026" />
+      <button id="login-btn" class="btn-primary">시작하기</button>
+      <p class="hint">※ Firebase 미설정 시 로컬 모드로 동작합니다 (공유는 같은 기기 내에서만).</p>
+    </div>
+  </div>
+
+  <!-- Main App -->
+  <div id="app" class="screen hidden">
+    <header class="app-header">
+      <div class="header-title">
+        <span id="header-day">D-Day</span>
+        <h2 id="header-text">오늘의 일정</h2>
+      </div>
+      <div class="header-actions">
+        <span id="sync-status" class="sync-badge offline" title="동기화 상태">●</span>
+        <button id="logout-btn" class="icon-btn" title="로그아웃">⎋</button>
+      </div>
+    </header>
+
+    <main id="content">
+      <!-- Today View -->
+      <section id="view-today" class="view active">
+        <div id="proximity-banner" class="proximity-banner hidden">
+          <div class="banner-content">
+            <span class="banner-icon">📍</span>
+            <div>
+              <strong id="proximity-title">근처 도착</strong>
+              <p id="proximity-desc"></p>
+            </div>
+            <button id="proximity-dismiss" class="icon-btn">✕</button>
+          </div>
+        </div>
+
+        <div id="day-selector" class="day-pills"></div>
+
+        <div id="day-header" class="day-header"></div>
+        <div id="events-list" class="events-list"></div>
+      </section>
+
+      <!-- Map View -->
+      <section id="view-map" class="view">
+        <div id="map"></div>
+        <div id="map-status" class="map-status">위치 확인 중...</div>
+      </section>
+
+      <!-- Checklist View -->
+      <section id="view-checklist" class="view">
+        <div class="section-header">
+          <h3>📋 준비물 체크리스트</h3>
+          <p>둘이서 함께 체크. 실시간 동기화됩니다.</p>
+        </div>
+        <div id="checklist-content"></div>
+        <div class="checklist-footer">
+          <input id="new-item-text" type="text" placeholder="새 항목 추가..." />
+          <select id="new-item-cat"></select>
+          <button id="add-item-btn" class="btn-primary">추가</button>
+        </div>
+      </section>
+
+      <!-- Tips View -->
+      <section id="view-tips" class="view">
+        <div class="section-header">
+          <h3>⚠️ 주의사항 & 팁</h3>
+          <p>해외여행 중 꼭 알아둬야 할 사항들</p>
+        </div>
+        <div id="tips-content"></div>
+
+        <div class="emergency-card">
+          <h4>📞 긴급 연락처</h4>
+          <div id="emergency-list"></div>
+        </div>
+      </section>
+
+      <!-- Notes View -->
+      <section id="view-notes" class="view">
+        <div class="section-header">
+          <h3>📝 공유 메모</h3>
+          <p>둘이서 자유롭게 메모. 실시간 동기화됩니다.</p>
+        </div>
+        <textarea id="shared-notes" placeholder="여행 중 메모, 영수증 번호, 갑작스런 일정 변경, 맛집 추천 등 자유롭게 적어보세요..."></textarea>
+        <p id="notes-status" class="notes-status">저장됨</p>
+      </section>
+    </main>
+
+    <nav class="bottom-nav">
+      <button class="nav-btn active" data-view="today"><span>🗓️</span><span>일정</span></button>
+      <button class="nav-btn" data-view="map"><span>🗺️</span><span>지도</span></button>
+      <button class="nav-btn" data-view="checklist"><span>📋</span><span>준비물</span></button>
+      <button class="nav-btn" data-view="tips"><span>⚠️</span><span>팁</span></button>
+      <button class="nav-btn" data-view="notes"><span>📝</span><span>메모</span></button>
+    </nav>
+  </div>
+
+  <!-- Config & Data -->
+  <script src="js/config.js"></script>
+  <script src="js/data.js"></script>
+
+  <!-- Firebase (optional - works offline if not configured) -->
+  <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+
+  <!-- App modules -->
+  <script src="js/sync.js"></script>
+  <script src="js/checklist.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/app.js"></script>
+
+  <!-- Service Worker -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(console.warn);
+      });
+    }
+  </script>
+</body>
+</html>

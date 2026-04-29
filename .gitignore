@@ -1,0 +1,24 @@
+# OS / Editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# Node / build artifacts
+node_modules/
+dist/
+.cache/
+
+# Python
+__pycache__/
+*.pyc
+
+# Local env / secrets
+.env
+.env.local
+.firebaserc
+firebase-debug.log
+
+# Local copy of config with real keys (optional safety net)
+travel-guide/js/config.local.js

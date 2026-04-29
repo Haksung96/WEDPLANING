@@ -1,0 +1,26 @@
+{
+  "name": "허니문 지중해 크루즈 가이드",
+  "short_name": "허니문 가이드",
+  "description": "5/10~5/19 지중해 크루즈 일정·지도·체크리스트·메모 공유",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f0f1a",
+  "theme_color": "#1a1a2e",
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
