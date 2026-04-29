@@ -73,6 +73,12 @@ const App = (() => {
     renderDayPills();
     startClock();
     showOnboardingIfNeeded();
+    Mobile.bindHaptic();
+    Mobile.disableDoubleTapZoom();
+    Mobile.bindSwipe(
+      () => navigateDay(+1),   // swipe left → next day
+      () => navigateDay(-1),   // swipe right → prev day
+    );
 
     // Default to today (or trip start if today is outside range)
     setActiveDay(getDefaultDayIndex());
@@ -198,9 +204,23 @@ const App = (() => {
   function setActiveDay(i) {
     currentDayIndex = i;
     renderDayPills();
+    // Reset auto-scroll flag so we re-scroll to active card on day change
+    const list = document.getElementById('events-list');
+    if (list) delete list.dataset.scrolled;
     renderTodayView();
     MapView.setDayIndex(i);
     updateHeader('today');
+    // Scroll active day pill into view horizontally
+    requestAnimationFrame(() => {
+      const active = document.querySelector('.day-pill.active');
+      if (active) active.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    });
+  }
+
+  function navigateDay(delta) {
+    const next = currentDayIndex + delta;
+    if (next < 0 || next >= TRIP.days.length) return;
+    setActiveDay(next);
   }
 
   // -------- TODAY VIEW --------
@@ -238,6 +258,20 @@ const App = (() => {
     `;
 
     renderQuickGlance(day, isToday);
+
+    // First-time swipe hint
+    if (!localStorage.getItem('wedplan:swipe-hint-shown')) {
+      const hint = document.createElement('div');
+      hint.className = 'swipe-hint';
+      hint.innerHTML = '👆 좌우 스와이프로 다른 날짜 이동';
+      header.appendChild(hint);
+      setTimeout(() => hint.classList.add('show'), 100);
+      setTimeout(() => {
+        hint.classList.remove('show');
+        setTimeout(() => hint.remove(), 300);
+        localStorage.setItem('wedplan:swipe-hint-shown', '1');
+      }, 4000);
+    }
 
     const list = document.getElementById('events-list');
     list.innerHTML = '';
