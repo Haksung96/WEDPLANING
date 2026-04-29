@@ -75,6 +75,16 @@
 
       <!-- Today View -->
       <section id="view-today" class="view active">
+        <!-- Re-boarding countdown (port days only, when applicable) -->
+        <div id="reboarding-banner" class="reboarding-banner hidden">
+          <div class="rb-icon">🛳️</div>
+          <div class="rb-body">
+            <div class="rb-label">재승선까지</div>
+            <div class="rb-time" id="rb-countdown">--</div>
+            <div class="rb-meta" id="rb-meta"></div>
+          </div>
+        </div>
+
         <div id="proximity-banner" class="proximity-banner hidden">
           <div class="banner-content">
             <span class="banner-icon">📍</span>
@@ -188,6 +198,8 @@
   <script src="js/checklist.js"></script>
   <script src="js/expenses.js"></script>
   <script src="js/weather.js"></script>
+  <script src="js/presence.js"></script>
+  <script src="js/reboarding.js"></script>
   <script src="js/map.js"></script>
   <script src="js/mobile.js"></script>
   <script src="js/app.js"></script>

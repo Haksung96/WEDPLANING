@@ -80,6 +80,16 @@ const App = (() => {
       () => navigateDay(-1),   // swipe right → prev day
     );
 
+    // Re-boarding countdown — only updates when viewing today
+    Reboarding.start(
+      () => {
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const day = TRIP.days[currentDayIndex];
+        return day && day.date === todayStr ? day : null;
+      },
+      renderReboardingBanner
+    );
+
     // Default to today (or trip start if today is outside range)
     setActiveDay(getDefaultDayIndex());
 
@@ -402,6 +412,54 @@ const App = (() => {
         <ul>${cat.items.map((it) => `<li>${esc(it)}</li>`).join('')}</ul>
       `;
       root.appendChild(div);
+    });
+  }
+
+  let lastReboardingNotifiedKey = null;
+  function renderReboardingBanner(state) {
+    const banner = document.getElementById('reboarding-banner');
+    const countdown = document.getElementById('rb-countdown');
+    const meta = document.getElementById('rb-meta');
+    if (!banner) return;
+
+    if (!state) {
+      banner.classList.add('hidden');
+      banner.classList.remove('warning', 'critical', 'past');
+      return;
+    }
+
+    banner.classList.remove('hidden', 'warning', 'critical', 'past');
+    banner.classList.add(state.urgency);
+
+    const fmt = (mins) => {
+      if (mins < 0) return `지났음 (${Math.abs(mins)}분 초과)`;
+      const h = Math.floor(mins / 60);
+      const m = mins % 60;
+      if (h === 0) return `${m}분 남음`;
+      return `${h}시간 ${m}분 남음`;
+    };
+    countdown.textContent = fmt(state.minsUntil);
+    meta.textContent = `${state.time} · ${state.title}`;
+
+    // Notify on threshold crossings (60 / 30 / 15 min)
+    const day = TRIP.days[currentDayIndex];
+    const thresholds = [60, 30, 15, 5];
+    thresholds.forEach((t) => {
+      if (state.minsUntil > 0 && state.minsUntil <= t && state.minsUntil > t - 1) {
+        const key = `${day.date}-${t}`;
+        if (lastReboardingNotifiedKey !== key) {
+          lastReboardingNotifiedKey = key;
+          if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification('🛳️ 재승선 알림', {
+              body: `${state.minsUntil}분 후 ${state.title}. 지금 항구로 이동하세요.`,
+              icon: 'icons/icon-192.png',
+            });
+          }
+          if (typeof Mobile !== 'undefined') {
+            Mobile.tap(t <= 30 ? 'error' : 'success');
+          }
+        }
+      }
     });
   }
 

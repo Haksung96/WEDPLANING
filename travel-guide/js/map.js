@@ -3,6 +3,8 @@
 const MapView = (() => {
   let map = null;
   let userMarker = null;
+  let partnerMarker = null;
+  let partnerInfoWindow = null;
   let eventMarkers = [];
   let routeRenderers = [];     // DirectionsRenderer instances (one per leg)
   let routePolyline = null;    // Fallback straight-line polyline
@@ -12,6 +14,7 @@ const MapView = (() => {
   let currentDayIndex = 0;
   let proximityNotified = new Set();
   let directionsService = null;
+  let presenceStarted = false;
 
   function init() {
     if (!isMapsConfigured()) {
@@ -262,10 +265,23 @@ const MapView = (() => {
 
     watchId = navigator.geolocation.watchPosition(
       (pos) => {
-        lastPosition = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        lastPosition = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+        };
         if (map) updateUserMarker();
         checkProximity();
         setStatus(`📍 현재 위치 추적 중 (정확도 ${Math.round(pos.coords.accuracy)}m)`);
+
+        // Start spouse-presence sharing once we have our first fix
+        if (!presenceStarted && typeof Presence !== 'undefined') {
+          presenceStarted = true;
+          Presence.start(
+            () => lastPosition,
+            (partner) => updatePartnerMarker(partner)
+          );
+        }
       },
       (err) => {
         const msg = err.code === 1 ? '위치 권한이 거부되었습니다.' : '위치를 가져올 수 없습니다.';
@@ -273,6 +289,85 @@ const MapView = (() => {
       },
       { enableHighAccuracy: true, maximumAge: 10000, timeout: 30000 }
     );
+  }
+
+  function updatePartnerMarker(partner) {
+    if (!map || !partner || partner.lat == null || partner.lng == null) {
+      if (partnerMarker) {
+        partnerMarker.setMap(null);
+        partnerMarker = null;
+      }
+      return;
+    }
+
+    const pos = { lat: partner.lat, lng: partner.lng };
+    const stale = Presence.isStale(partner);
+    const ageStr = Presence.formatAge(partner._updatedAt);
+    const dist = lastPosition ? haversine(lastPosition, pos) : null;
+    const distStr = dist == null ? '' : (dist < 1000 ? `${Math.round(dist)}m` : `${(dist/1000).toFixed(1)}km`);
+
+    const partnerSvg = createPartnerMarker(partner.name || '👤', stale);
+    const title = `${partner.name} · ${ageStr}${distStr ? ' · ' + distStr : ''}`;
+
+    if (partnerMarker) {
+      partnerMarker.setPosition(pos);
+      partnerMarker.setIcon({
+        url: partnerSvg,
+        scaledSize: new google.maps.Size(40, 48),
+        anchor: new google.maps.Point(20, 48),
+      });
+      partnerMarker.setTitle(title);
+    } else {
+      partnerMarker = new google.maps.Marker({
+        position: pos,
+        map,
+        title,
+        icon: {
+          url: partnerSvg,
+          scaledSize: new google.maps.Size(40, 48),
+          anchor: new google.maps.Point(20, 48),
+        },
+        zIndex: 9000,
+      });
+
+      partnerInfoWindow = new google.maps.InfoWindow();
+      partnerMarker.addListener('click', () => {
+        const ageNow = Presence.formatAge(partner._updatedAt);
+        const distNow = lastPosition ? haversine(lastPosition, pos) : null;
+        const distNowStr = distNow == null ? '' : (distNow < 1000 ? `${Math.round(distNow)}m` : `${(distNow/1000).toFixed(1)}km`);
+        partnerInfoWindow.setContent(`
+          <div style="padding:8px; min-width:180px;">
+            <strong>📍 ${escape(partner.name)}</strong><br/>
+            <small>마지막 업데이트: ${escape(ageNow)}</small><br/>
+            ${distNowStr ? `<small>나와의 거리: <strong>${escape(distNowStr)}</strong></small><br/>` : ''}
+            <a href="https://www.google.com/maps/dir/?api=1&destination=${pos.lat},${pos.lng}&travelmode=walking"
+               target="_blank"
+               style="display:inline-block; margin-top:6px; font-size:12px; color:#ff6b9d; font-weight:700;">
+              ↗️ 만나러 가기
+            </a>
+          </div>
+        `);
+        partnerInfoWindow.open(map, partnerMarker);
+      });
+    }
+
+    // Show banner with distance/age in map status
+    setStatus(`💑 ${partner.name} 위치: ${ageStr}${distStr ? ' · ' + distStr + ' 거리' : ''}${stale ? ' · 오래됨' : ''}`);
+  }
+
+  function createPartnerMarker(name, stale) {
+    const color = stale ? '#94a3b8' : '#a78bfa';
+    const ring = stale ? '#64748b' : '#7c3aed';
+    const svg = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="40" height="48" viewBox="0 0 40 48">
+        <circle cx="20" cy="20" r="18" fill="${color}" opacity="0.25"/>
+        <circle cx="20" cy="20" r="14" fill="${color}" stroke="white" stroke-width="3"/>
+        <text x="20" y="25" text-anchor="middle" font-family="-apple-system,Segoe UI,sans-serif"
+              font-size="14" font-weight="800" fill="white">💕</text>
+        <path d="M14 36 L20 46 L26 36 Z" fill="${ring}" stroke="white" stroke-width="1.5"/>
+      </svg>
+    `.trim();
+    return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
   }
 
   function updateUserMarker() {
