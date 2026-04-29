@@ -573,6 +573,80 @@ input, textarea, select { font-family: inherit; }
   font-family: inherit !important;
 }
 
+/* ========== ONBOARDING BANNER ========== */
+.onboarding-banner {
+  margin: 12px 16px 0;
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  color: #1a1a2e;
+  padding: 12px;
+  border-radius: 12px;
+}
+.onboarding-banner .banner-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.onboarding-banner .banner-icon { font-size: 22px; }
+.onboarding-banner strong { display: block; font-size: 14px; margin-bottom: 2px; }
+.onboarding-banner p { font-size: 12px; line-height: 1.4; }
+.onboarding-banner .pill-btn {
+  background: rgba(0,0,0,0.15);
+  color: #1a1a2e;
+  font-weight: 700;
+  white-space: nowrap;
+  padding: 6px 12px;
+}
+.onboarding-banner .icon-btn {
+  background: rgba(0,0,0,0.1);
+  color: #1a1a2e;
+  width: 28px;
+  height: 28px;
+  font-size: 14px;
+}
+
+/* ========== QUICK GLANCE ========== */
+.quick-glance {
+  background: var(--bg-card);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+.qg-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.qg-progress { flex: 1; min-width: 0; }
+.qg-bar {
+  height: 6px;
+  background: var(--bg-elev);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.qg-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary), var(--accent));
+  transition: width 0.3s ease;
+}
+.qg-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+.qg-meta strong { color: var(--text); }
+.qg-weather {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 12px;
+  border-left: 1px solid var(--border);
+}
+.qg-icon { font-size: 28px; line-height: 1; }
+.qg-tempbox { display: flex; flex-direction: column; }
+.qg-tempbox strong { font-size: 14px; font-weight: 700; }
+.qg-tempbox small { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+.qg-temp { font-size: 12px; color: var(--text-muted); }
+
 /* ========== ACTIVE/NEXT EVENT ========== */
 .now-tag {
   display: inline-block;

@@ -56,6 +56,7 @@ const App = (() => {
     renderPhrases();
     renderDayPills();
     startClock();
+    showOnboardingIfNeeded();
 
     // Default to today (or trip start if today is outside range)
     setActiveDay(getDefaultDayIndex());
@@ -220,6 +221,8 @@ const App = (() => {
       ${nextBadge}
     `;
 
+    renderQuickGlance(day, isToday);
+
     const list = document.getElementById('events-list');
     list.innerHTML = '';
     day.events.forEach((evt, i) => {
@@ -319,7 +322,9 @@ const App = (() => {
   }
 
   function openGoogleMaps(location) {
-    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location.name)}&query_place_id=${location.lat},${location.lng}`;
+    // Use directions API from current location → destination, default walking
+    const dest = encodeURIComponent(`${location.lat},${location.lng}`);
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${dest}&destination_place_id=${encodeURIComponent(location.name)}&travelmode=walking`;
     window.open(url, '_blank');
   }
 
@@ -336,6 +341,95 @@ const App = (() => {
       `;
       root.appendChild(div);
     });
+  }
+
+  function showOnboardingIfNeeded() {
+    const banner = document.getElementById('onboarding-banner');
+    const title = document.getElementById('onb-title');
+    const desc = document.getElementById('onb-desc');
+    const action = document.getElementById('onb-action');
+    const dismiss = document.getElementById('onb-dismiss');
+    if (!banner) return;
+
+    const dismissed = sessionStorage.getItem('wedplan:onboarding-dismissed');
+    if (dismissed) return;
+
+    const isFile = location.protocol === 'file:';
+    const noMaps = !isMapsConfigured();
+    const noFirebase = !isFirebaseConfigured();
+
+    let lines = [];
+    if (isFile) {
+      lines.push('파일 직접 열기는 일부 기능 제한. 시작하기.bat 사용 권장.');
+    }
+    if (noMaps && noFirebase) {
+      lines.push('지도 + 실시간 공유 사용하려면 설정에서 API 키 입력 필요.');
+    } else if (noMaps) {
+      lines.push('지도 기능을 사용하려면 Google Maps API 키 필요.');
+    } else if (noFirebase) {
+      lines.push('둘이서 실시간 공유하려면 Firebase 설정 필요. (현재는 로컬 모드)');
+    }
+
+    if (lines.length === 0) return;
+
+    title.textContent = isFile ? 'file:// 으로 열림' : '설정이 필요해요';
+    desc.textContent = lines.join(' ');
+    banner.classList.remove('hidden');
+
+    action.onclick = () => {
+      banner.classList.add('hidden');
+      showView('settings');
+    };
+    dismiss.onclick = () => {
+      banner.classList.add('hidden');
+      sessionStorage.setItem('wedplan:onboarding-dismissed', '1');
+    };
+  }
+
+  function renderQuickGlance(day, isToday) {
+    const root = document.getElementById('quick-glance');
+    if (!root) return;
+    if (!isToday) {
+      root.classList.add('hidden');
+      return;
+    }
+
+    const total = day.events.length;
+    const done = day.events.filter((_, i) => progress[`${day.date}-${i}`]?.done).length;
+    const pct = total ? Math.round((done / total) * 100) : 0;
+
+    root.classList.remove('hidden');
+    root.innerHTML = `
+      <div class="qg-row">
+        <div class="qg-progress">
+          <div class="qg-bar"><div class="qg-fill" style="width:${pct}%"></div></div>
+          <div class="qg-meta">오늘 진행: <strong>${done}/${total}</strong> (${pct}%)</div>
+        </div>
+        <div id="qg-weather" class="qg-weather">
+          <span class="qg-icon">⏳</span>
+          <span class="qg-temp">날씨 로딩...</span>
+        </div>
+      </div>
+    `;
+
+    if (day.cityCenter) {
+      Weather.getDayForecast(day.date, day.cityCenter.lat, day.cityCenter.lng).then((w) => {
+        const el = document.getElementById('qg-weather');
+        if (!el) return;
+        if (!w) {
+          el.innerHTML = '<span class="qg-icon">🌐</span><span class="qg-temp">날씨 정보 없음</span>';
+          return;
+        }
+        const wd = Weather.describe(w.weatherCode);
+        el.innerHTML = `
+          <span class="qg-icon" title="${wd.text}">${wd.icon}</span>
+          <div class="qg-tempbox">
+            <strong>${w.tempMax}° / ${w.tempMin}°</strong>
+            <small>강수 ${w.rainChance ?? 0}% · 일출 ${Weather.formatTime(w.sunrise)} 일몰 ${Weather.formatTime(w.sunset)}</small>
+          </div>
+        `;
+      });
+    }
   }
 
   function renderPhrases() {
