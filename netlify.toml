@@ -1,0 +1,24 @@
+# Netlify config — works whether the repo is public or private.
+# Connect at https://app.netlify.com/start, pick this repo, deploy.
+
+[build]
+  publish = "travel-guide"
+  # No build command needed - this is a static site.
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+    Service-Worker-Allowed = "/"
+
+[[headers]]
+  for = "/manifest.json"
+  [headers.values]
+    Cache-Control = "no-cache"

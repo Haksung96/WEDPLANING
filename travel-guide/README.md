@@ -98,7 +98,7 @@ firebase deploy
 **GitHub Pages**
 1. Repository에 push (이미 했음).
 2. Settings → Pages → Source: `main` branch, `/` (root) 선택.
-3. `https://Haksung96.github.io/WEDPLANING/travel-guide/` 로 접속.
+3. `https://haksung96.github.io/WEDPLANING/` 로 접속 (워크플로우가 travel-guide를 사이트 루트로 배포함).
 
 배포 후 받은 URL을 핸드폰 Safari/Chrome 에서 열고 → **공유 → 홈 화면에 추가** 하면 앱처럼 사용 가능.
 
