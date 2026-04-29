@@ -47,12 +47,15 @@ const App = (() => {
 
     // Initialize subsystems
     Checklist.init();
+    Expenses.init();
     MapView.init();
     setupNavigation();
     setupNotes();
     renderTips();
     renderEmergency();
+    renderPhrases();
     renderDayPills();
+    startClock();
 
     // Default to today (or trip start if today is outside range)
     setActiveDay(getDefaultDayIndex());
@@ -87,14 +90,36 @@ const App = (() => {
     document.querySelectorAll('.nav-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
         const view = btn.dataset.view;
-        document.querySelectorAll('.nav-btn').forEach((b) => b.classList.toggle('active', b === btn));
-        document.querySelectorAll('.view').forEach((v) => v.classList.toggle('active', v.id === `view-${view}`));
-        // When switching to map, ensure markers reflect current day
-        if (view === 'map') MapView.setDayIndex(currentDayIndex);
-        // Update header
-        updateHeader(view);
+        if (view === 'more') {
+          document.getElementById('more-menu').classList.remove('hidden');
+          return;
+        }
+        showView(view, btn);
       });
     });
+
+    // More menu items
+    document.querySelectorAll('.more-item[data-view]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        showView(btn.dataset.view);
+        document.getElementById('more-menu').classList.add('hidden');
+      });
+    });
+    document.querySelectorAll('[data-close-more]').forEach((el) => {
+      el.addEventListener('click', () => {
+        document.getElementById('more-menu').classList.add('hidden');
+      });
+    });
+  }
+
+  function showView(view, btn) {
+    document.querySelectorAll('.nav-btn').forEach((b) => b.classList.toggle('active',
+      btn ? b === btn : b.dataset.view === view));
+    document.querySelectorAll('.view').forEach((v) => v.classList.toggle('active', v.id === `view-${view}`));
+    if (view === 'map') MapView.setDayIndex(currentDayIndex);
+    if (view === 'expenses') Expenses.bind();
+    if (view === 'settings') Settings.bind();
+    updateHeader(view);
   }
 
   function updateHeader(view) {
@@ -113,6 +138,15 @@ const App = (() => {
     } else if (view === 'notes') {
       dayLabel.textContent = '메모';
       txt.textContent = '공유 메모';
+    } else if (view === 'expenses') {
+      dayLabel.textContent = '지출';
+      txt.textContent = '여행 지출 기록';
+    } else if (view === 'phrases') {
+      dayLabel.textContent = '회화';
+      txt.textContent = '여행 필수 표현';
+    } else if (view === 'settings') {
+      dayLabel.textContent = '설정';
+      txt.textContent = 'API 키 / 공유';
     }
   }
 
@@ -157,11 +191,33 @@ const App = (() => {
     const day = TRIP.days[currentDayIndex];
     if (!day) return;
 
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const isToday = day.date === todayStr;
+    const nowMin = nowMinutes();
+
+    // Compute active/next event indices (only meaningful for "today")
+    let activeIdx = -1, nextIdx = -1;
+    if (isToday) {
+      day.events.forEach((evt, i) => {
+        const m = parseTimeToMin(evt.time);
+        if (m == null) return;
+        if (m <= nowMin) activeIdx = i;
+        if (m > nowMin && nextIdx === -1) nextIdx = i;
+      });
+    }
+
     const header = document.getElementById('day-header');
+    let nextBadge = '';
+    if (isToday && nextIdx >= 0) {
+      const nextEvt = day.events[nextIdx];
+      const minsUntil = parseTimeToMin(nextEvt.time) - nowMin;
+      nextBadge = `<div class="next-up">⏭️ 다음: <strong>${esc(nextEvt.time)} ${esc(nextEvt.title)}</strong> · ${formatCountdown(minsUntil)} 후</div>`;
+    }
     header.innerHTML = `
-      <h3>${esc(day.title)}</h3>
+      <h3>${esc(day.title)}${isToday ? ' <span class="now-tag">NOW</span>' : ''}</h3>
       <div class="day-sub">${esc(day.date)} (${esc(day.weekday)}) · ${esc(day.subtitle || '')}</div>
       ${day.tips ? `<div class="day-tip">💡 ${esc(day.tips)}</div>` : ''}
+      ${nextBadge}
     `;
 
     const list = document.getElementById('events-list');
@@ -169,14 +225,23 @@ const App = (() => {
     day.events.forEach((evt, i) => {
       const key = `${day.date}-${i}`;
       const done = !!(progress[key] && progress[key].done);
+      const isActive = isToday && i === activeIdx && !done;
+      const isNext = isToday && i === nextIdx;
 
       const card = document.createElement('div');
-      card.className = `event-card tag-${evt.tag || ''}${done ? ' completed' : ''}`;
+      const cls = ['event-card', `tag-${evt.tag || ''}`];
+      if (done) cls.push('completed');
+      if (isActive) cls.push('active');
+      if (isNext) cls.push('next');
+      card.className = cls.join(' ');
+
       const updatedBy = progress[key] && progress[key]._updatedBy ? progress[key]._updatedBy : null;
+      const stateBadge = isActive ? '<span class="state-badge now">진행중</span>' :
+                         isNext ? '<span class="state-badge next">다음</span>' : '';
       card.innerHTML = `
         <div class="event-time">${esc(evt.time)}</div>
         <div class="event-body">
-          <div class="event-title">${esc(evt.title)}</div>
+          <div class="event-title">${stateBadge}${esc(evt.title)}</div>
           ${evt.desc ? `<div class="event-desc">${esc(evt.desc)}</div>` : ''}
           ${evt.location ? `<div class="event-desc" style="margin-top:6px;">📍 ${esc(evt.location.name)}</div>` : ''}
           <div class="event-actions">
@@ -188,6 +253,13 @@ const App = (() => {
       `;
       list.appendChild(card);
     });
+
+    // Auto-scroll to active/next on first paint of today
+    if (isToday && !list.dataset.scrolled) {
+      const target = list.querySelector('.event-card.active') || list.querySelector('.event-card.next');
+      if (target) setTimeout(() => target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 200);
+      list.dataset.scrolled = '1';
+    }
 
     // Wire actions
     list.querySelectorAll('[data-toggle]').forEach((btn) => {
@@ -206,6 +278,39 @@ const App = (() => {
         } catch (err) { console.warn(err); }
       });
     });
+  }
+
+  function nowMinutes() {
+    const d = new Date();
+    return d.getHours() * 60 + d.getMinutes();
+  }
+
+  function parseTimeToMin(timeStr) {
+    if (!timeStr) return null;
+    // "20:30" or "08:30" or "13:00 ~ 14:00" — first time wins
+    const m = String(timeStr).match(/^(\d{1,2}):(\d{2})/);
+    if (!m) return null;
+    return Number(m[1]) * 60 + Number(m[2]);
+  }
+
+  function formatCountdown(mins) {
+    if (mins < 0) return '지남';
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    if (h === 0) return `${m}분`;
+    if (m === 0) return `${h}시간`;
+    return `${h}시간 ${m}분`;
+  }
+
+  let clockTimer = null;
+  function startClock() {
+    if (clockTimer) clearInterval(clockTimer);
+    clockTimer = setInterval(() => {
+      const today = TRIP.days[currentDayIndex];
+      if (!today) return;
+      const todayStr = new Date().toISOString().slice(0, 10);
+      if (today.date === todayStr) renderTodayView();
+    }, 60000);   // every minute
   }
 
   function toggleEventDone(key) {
@@ -231,6 +336,32 @@ const App = (() => {
       `;
       root.appendChild(div);
     });
+  }
+
+  function renderPhrases() {
+    const root = document.getElementById('view-phrases');
+    if (!root) return;
+    let html = `
+      <div class="section-header">
+        <h3>🗣️ 여행 회화</h3>
+        <p>한국어 → 🇪🇸 스페인어 / 🇮🇹 이탈리아어 / 🇫🇷 프랑스어</p>
+      </div>
+    `;
+    PHRASES.forEach((cat) => {
+      html += `<div class="phrase-cat"><h4>${esc(cat.category)}</h4>`;
+      cat.items.forEach((p) => {
+        html += `
+          <div class="phrase-row">
+            <div class="phrase-ko">${esc(p.ko)}</div>
+            <div class="phrase-tr"><span class="flag">🇪🇸</span> ${esc(p.es)}</div>
+            <div class="phrase-tr"><span class="flag">🇮🇹</span> ${esc(p.it)}</div>
+            <div class="phrase-tr"><span class="flag">🇫🇷</span> ${esc(p.fr)}</div>
+          </div>
+        `;
+      });
+      html += '</div>';
+    });
+    root.innerHTML = html;
   }
 
   function renderEmergency() {
