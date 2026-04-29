@@ -573,6 +573,113 @@ input, textarea, select { font-family: inherit; }
   font-family: inherit !important;
 }
 
+/* ========== INSTALL UI ========== */
+.install-link {
+  display: block;
+  text-align: center;
+  margin-top: 14px;
+  padding: 10px;
+  font-size: 13px;
+  color: var(--accent);
+  text-decoration: none;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.ios-install-hint {
+  position: fixed;
+  bottom: calc(80px + var(--safe-bottom));
+  left: 16px;
+  right: 16px;
+  z-index: 200;
+  animation: slideUp 0.3s ease-out;
+}
+.iih-content {
+  background: linear-gradient(135deg, #1a1a2e, #2d1b3d);
+  color: white;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--primary);
+  position: relative;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+}
+.iih-content::after {
+  content: '';
+  position: absolute;
+  bottom: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-top: 10px solid #2d1b3d;
+}
+.iih-content strong { display: block; margin-bottom: 6px; font-size: 15px; }
+.iih-content p { font-size: 13px; line-height: 1.5; color: #d0d0e0; }
+.iih-icon {
+  display: inline-block;
+  background: var(--primary);
+  color: white;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 20px;
+  margin: 0 2px;
+}
+.iih-close {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  font-size: 16px;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+}
+
+.install-chip {
+  position: fixed;
+  bottom: calc(80px + var(--safe-bottom));
+  right: 16px;
+  z-index: 150;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: white;
+  border: none;
+  padding: 10px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: 0 6px 20px rgba(255, 107, 157, 0.4);
+  animation: slideUp 0.3s;
+}
+
+.qr-box {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  margin-top: 8px;
+}
+.qr-box img {
+  width: 140px;
+  height: 140px;
+  background: white;
+  border-radius: 10px;
+  padding: 6px;
+}
+.qr-box .qr-info {
+  flex: 1;
+  font-size: 13px;
+}
+.qr-box code {
+  background: var(--bg-elev);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: ui-monospace, 'SF Mono', monospace;
+  font-size: 12px;
+}
+
 /* ========== ONBOARDING BANNER ========== */
 .onboarding-banner {
   margin: 12px 16px 0;

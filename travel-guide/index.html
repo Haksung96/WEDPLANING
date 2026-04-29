@@ -32,7 +32,17 @@
       <label>트립 코드 (둘이 같은 코드)</label>
       <input id="trip-code" type="text" maxlength="20" placeholder="예: honeymoon2026" value="honeymoon2026" />
       <button id="login-btn" class="btn-primary">시작하기</button>
+      <a href="install.html" class="install-link">📱 핸드폰 홈 화면에 설치하기</a>
       <p class="hint">※ Firebase 미설정 시 로컬 모드로 동작합니다 (공유는 같은 기기 내에서만).</p>
+    </div>
+  </div>
+
+  <!-- iOS install hint (shown once for iOS Safari first-time visitors) -->
+  <div id="ios-install-hint" class="ios-install-hint hidden">
+    <div class="iih-content">
+      <span class="iih-close" id="iih-close">✕</span>
+      <strong>📱 홈 화면에 추가하기</strong>
+      <p>하단 <span class="iih-icon">⬆</span> 공유 버튼 → <strong>"홈 화면에 추가"</strong> 누르면<br/>앱처럼 1-클릭 실행 가능합니다.</p>
     </div>
   </div>
 

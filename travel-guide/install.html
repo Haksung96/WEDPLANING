@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#1a1a2e" />
+  <title>📱 허니문 가이드 설치</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Pretendard', 'Apple SD Gothic Neo', sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #2d1b3d 100%);
+      color: #f5f5f7;
+      min-height: 100vh;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .card {
+      background: #1a1a2e;
+      border-radius: 20px;
+      padding: 28px 24px;
+      max-width: 460px;
+      width: 100%;
+      margin-bottom: 16px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+    }
+    h1 {
+      font-size: 28px;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, #ff6b9d, #ffd93d);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .subtitle { color: #a0a0b8; font-size: 14px; margin-bottom: 20px; }
+    .qr {
+      background: white;
+      padding: 12px;
+      border-radius: 14px;
+      width: 220px;
+      height: 220px;
+      margin: 0 auto 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .qr img { width: 100%; height: 100%; }
+    .url-row {
+      background: #252540;
+      border-radius: 10px;
+      padding: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .url-row code {
+      flex: 1;
+      font-size: 12px;
+      color: #ffd93d;
+      word-break: break-all;
+      font-family: ui-monospace, 'SF Mono', monospace;
+    }
+    button {
+      background: linear-gradient(135deg, #ff6b9d, #d4456e);
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .big-btn {
+      width: 100%;
+      padding: 16px;
+      font-size: 16px;
+      margin-top: 8px;
+      border-radius: 12px;
+    }
+    h2 { font-size: 16px; margin: 16px 0 8px; }
+    ol { padding-left: 22px; line-height: 1.9; font-size: 14px; color: #d0d0e0; }
+    .step-num {
+      display: inline-block;
+      width: 22px; height: 22px;
+      background: #ff6b9d;
+      color: white;
+      border-radius: 50%;
+      text-align: center;
+      font-weight: 800;
+      font-size: 12px;
+      line-height: 22px;
+      margin-right: 8px;
+    }
+    .platform-tab {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .platform-tab button {
+      flex: 1;
+      background: #252540;
+      color: #a0a0b8;
+      padding: 10px;
+      font-weight: 600;
+    }
+    .platform-tab button.active {
+      background: linear-gradient(135deg, #ff6b9d, #d4456e);
+      color: white;
+    }
+    .platform-content { display: none; }
+    .platform-content.active { display: block; }
+    .hint {
+      background: #252540;
+      padding: 12px;
+      border-radius: 10px;
+      font-size: 13px;
+      color: #d0d0e0;
+      margin-top: 12px;
+      border-left: 3px solid #ffd93d;
+      line-height: 1.6;
+    }
+    .center { text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1 class="center">💍 허니문 가이드</h1>
+    <p class="subtitle center">핸드폰 홈 화면에 1-클릭 설치</p>
+
+    <div class="qr center">
+      <img id="qr-img" src="" alt="QR 코드" />
+    </div>
+
+    <div class="url-row">
+      <code id="install-url"></code>
+      <button id="copy-btn">복사</button>
+    </div>
+
+    <a href="./" id="open-app" class="big-btn" style="display:block; text-align:center; text-decoration:none;">
+      🚀 지금 바로 앱 열기
+    </a>
+  </div>
+
+  <div class="card">
+    <h2>📱 핸드폰 홈 화면에 추가</h2>
+
+    <div class="platform-tab">
+      <button id="tab-ios" class="active">🍎 iPhone</button>
+      <button id="tab-android">🤖 Android</button>
+    </div>
+
+    <div id="content-ios" class="platform-content active">
+      <ol>
+        <li>Safari로 위 링크 열기</li>
+        <li>하단 <strong>공유 버튼 ⬆️</strong> 탭</li>
+        <li><strong>"홈 화면에 추가"</strong> 선택</li>
+        <li>오른쪽 위 <strong>"추가"</strong> 탭 → 끝!</li>
+      </ol>
+      <div class="hint">
+        ⚠️ 반드시 Safari에서 열어야 합니다 (Chrome/카톡 인앱브라우저는 PWA 설치 불가).
+      </div>
+    </div>
+
+    <div id="content-android" class="platform-content">
+      <ol>
+        <li>Chrome으로 위 링크 열기</li>
+        <li>주소창 옆 <strong>설치 버튼</strong> 또는 우측 상단 <strong>⋮ 메뉴</strong> 탭</li>
+        <li><strong>"앱 설치"</strong> 또는 <strong>"홈 화면에 추가"</strong> 선택</li>
+        <li>"설치" 확인 → 끝!</li>
+      </ol>
+      <div class="hint">
+        💡 PWA 지원 브라우저: Chrome, Edge, Samsung Internet
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>👬 둘이서 같이 쓰기</h2>
+    <ol>
+      <li>둘 다 위 링크 설치</li>
+      <li>같은 <strong>트립 코드</strong> (예: <code style="background:#252540; padding:2px 6px; border-radius:4px;">honeymoon2026</code>) 입력</li>
+      <li>한 쪽이 체크/추가/지출 입력 → 상대방에게 즉시 동기화 ✓</li>
+    </ol>
+    <div class="hint">
+      Firebase 미설정 시 로컬 모드 (각자 기기에만 저장). 실시간 공유 원하면 앱 안 ⚙️ 설정에서 Firebase config 입력.
+    </div>
+  </div>
+
+  <script>
+    const url = location.href.replace(/install\.html.*$/, '');
+    document.getElementById('install-url').textContent = url;
+    document.getElementById('open-app').href = url;
+
+    // QR code from a free public API (no key required)
+    const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=8&data=' + encodeURIComponent(url);
+    document.getElementById('qr-img').src = qrUrl;
+
+    document.getElementById('copy-btn').addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(url);
+        const b = document.getElementById('copy-btn');
+        const orig = b.textContent;
+        b.textContent = '✓ 복사됨';
+        setTimeout(() => b.textContent = orig, 1500);
+      } catch {
+        alert('URL: ' + url);
+      }
+    });
+
+    function showTab(name) {
+      ['ios', 'android'].forEach((p) => {
+        document.getElementById('tab-' + p).classList.toggle('active', p === name);
+        document.getElementById('content-' + p).classList.toggle('active', p === name);
+      });
+    }
+    document.getElementById('tab-ios').addEventListener('click', () => showTab('ios'));
+    document.getElementById('tab-android').addEventListener('click', () => showTab('android'));
+
+    // Auto-detect platform
+    if (/Android/i.test(navigator.userAgent)) showTab('android');
+  </script>
+</body>
+</html>

@@ -1,14 +1,17 @@
-// Google Maps integration with geolocation + proximity detection.
+// Google Maps integration with geolocation + proximity detection + route drawing.
 
 const MapView = (() => {
   let map = null;
   let userMarker = null;
   let eventMarkers = [];
+  let routeRenderers = [];     // DirectionsRenderer instances (one per leg)
+  let routePolyline = null;    // Fallback straight-line polyline
   let watchId = null;
   let lastPosition = null;
   let mapsLoaded = false;
   let currentDayIndex = 0;
   let proximityNotified = new Set();
+  let directionsService = null;
 
   function init() {
     if (!isMapsConfigured()) {
@@ -73,7 +76,98 @@ const MapView = (() => {
       styles: getDarkMapStyle(),
     });
 
+    directionsService = new google.maps.DirectionsService();
     renderMarkersForDay();
+  }
+
+  function clearRoute() {
+    routeRenderers.forEach((r) => r.setMap(null));
+    routeRenderers = [];
+    if (routePolyline) {
+      routePolyline.setMap(null);
+      routePolyline = null;
+    }
+  }
+
+  function drawRoute(events) {
+    clearRoute();
+    if (!map || events.length < 2) return;
+
+    // Try Directions API first (gives real walking paths along streets)
+    drawRouteWithDirections(events).catch((err) => {
+      console.warn('Directions API failed, drawing straight-line route:', err);
+      drawStraightLineRoute(events);
+    });
+  }
+
+  async function drawRouteWithDirections(events) {
+    // Split into legs of consecutive locations
+    const positions = events.map((e) => ({ lat: e.location.lat, lng: e.location.lng }));
+
+    // Use a single Directions request with waypoints (max 10 in free tier; we usually have <10)
+    const origin = positions[0];
+    const destination = positions[positions.length - 1];
+    const waypoints = positions.slice(1, -1).map((p) => ({ location: p, stopover: true }));
+
+    return new Promise((resolve, reject) => {
+      directionsService.route(
+        {
+          origin,
+          destination,
+          waypoints,
+          travelMode: google.maps.TravelMode.WALKING,
+          optimizeWaypoints: false,
+        },
+        (result, status) => {
+          if (status !== 'OK') {
+            // If WALKING fails (e.g., between cities), retry with DRIVING
+            if (status === 'ZERO_RESULTS') {
+              directionsService.route(
+                { origin, destination, waypoints, travelMode: google.maps.TravelMode.DRIVING, optimizeWaypoints: false },
+                (r2, s2) => s2 === 'OK' ? renderDirectionsResult(r2, resolve) : reject(new Error(s2))
+              );
+            } else {
+              reject(new Error(status));
+            }
+            return;
+          }
+          renderDirectionsResult(result, resolve);
+        }
+      );
+    });
+  }
+
+  function renderDirectionsResult(result, done) {
+    const renderer = new google.maps.DirectionsRenderer({
+      map,
+      directions: result,
+      suppressMarkers: true,    // we draw our own numbered markers
+      polylineOptions: {
+        strokeColor: '#ff6b9d',
+        strokeWeight: 5,
+        strokeOpacity: 0.85,
+      },
+    });
+    routeRenderers.push(renderer);
+    if (done) done();
+  }
+
+  function drawStraightLineRoute(events) {
+    if (!map) return;
+    const path = events.map((e) => ({ lat: e.location.lat, lng: e.location.lng }));
+    routePolyline = new google.maps.Polyline({
+      path,
+      geodesic: true,
+      strokeColor: '#ff6b9d',
+      strokeOpacity: 0,    // dashed via icons
+      strokeWeight: 0,
+      icons: [{
+        icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 3, strokeColor: '#ff6b9d' },
+        offset: '0',
+        repeat: '12px',
+      }],
+      map,
+    });
   }
 
   function renderMarkersForDay() {
@@ -81,6 +175,7 @@ const MapView = (() => {
 
     eventMarkers.forEach((m) => m.setMap(null));
     eventMarkers = [];
+    clearRoute();
 
     const day = TRIP.days[currentDayIndex];
     if (!day) return;
@@ -92,31 +187,40 @@ const MapView = (() => {
     }
 
     const bounds = new google.maps.LatLngBounds();
+    const eventsWithLocation = day.events.filter((e) => e.location);
 
-    day.events.forEach((evt, i) => {
-      if (!evt.location) return;
+    eventsWithLocation.forEach((evt, i) => {
       const pos = { lat: evt.location.lat, lng: evt.location.lng };
+
+      // Custom numbered marker as inline SVG data URI
+      const markerSvg = createNumberedMarker(i + 1, tagColor(evt.tag));
+
       const marker = new google.maps.Marker({
         position: pos,
         map,
-        label: { text: String(i + 1), color: 'white', fontWeight: 'bold', fontSize: '12px' },
         title: `${evt.time} ${evt.title}`,
         icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          scale: 14,
-          fillColor: tagColor(evt.tag),
-          fillOpacity: 1,
-          strokeColor: '#ffffff',
-          strokeWeight: 2,
+          url: markerSvg,
+          scaledSize: new google.maps.Size(36, 44),
+          anchor: new google.maps.Point(18, 44),
         },
+        zIndex: 100 + i,
       });
 
       const info = new google.maps.InfoWindow({
         content: `
-          <div style="padding:6px; min-width:180px;">
-            <strong>${escape(evt.time)} · ${escape(evt.title)}</strong><br/>
-            <small>${escape(evt.location.name)}</small>
-            ${evt.desc ? `<p style="margin-top:6px; font-size: 12px;">${escape(evt.desc)}</p>` : ''}
+          <div style="padding:6px; min-width:200px;">
+            <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
+              <span style="background:${tagColor(evt.tag)}; color:white; width:22px; height:22px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-weight:700; font-size:12px;">${i + 1}</span>
+              <strong>${escape(evt.time)} · ${escape(evt.title)}</strong>
+            </div>
+            <div style="font-size: 12px; color:#666;">📍 ${escape(evt.location.name)}</div>
+            ${evt.desc ? `<p style="margin-top:6px; font-size: 12px; line-height:1.4;">${escape(evt.desc)}</p>` : ''}
+            <a href="https://www.google.com/maps/dir/?api=1&destination=${pos.lat},${pos.lng}&travelmode=walking"
+               target="_blank"
+               style="display:inline-block; margin-top:8px; font-size:12px; color:#ff6b9d; font-weight:700;">
+              ↗️ Google 길찾기
+            </a>
           </div>
         `,
       });
@@ -125,8 +229,27 @@ const MapView = (() => {
       bounds.extend(pos);
     });
 
+    // Draw route connecting events in order
+    if (eventsWithLocation.length >= 2) {
+      drawRoute(eventsWithLocation);
+    }
+
     if (lastPosition) bounds.extend(lastPosition);
     if (!bounds.isEmpty()) map.fitBounds(bounds, 80);
+  }
+
+  // Create a numbered pin marker as inline SVG data URI
+  function createNumberedMarker(number, color) {
+    const svg = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="36" height="44" viewBox="0 0 36 44">
+        <path d="M18 0C8.06 0 0 8.06 0 18c0 13.5 18 26 18 26s18-12.5 18-26C36 8.06 27.94 0 18 0z"
+              fill="${color}" stroke="white" stroke-width="2"/>
+        <circle cx="18" cy="18" r="11" fill="white"/>
+        <text x="18" y="23" text-anchor="middle" font-family="-apple-system,Segoe UI,sans-serif"
+              font-size="14" font-weight="800" fill="${color}">${number}</text>
+      </svg>
+    `.trim();
+    return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
   }
 
   function startLocationWatch() {

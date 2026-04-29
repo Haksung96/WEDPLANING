@@ -9,6 +9,22 @@ const App = (() => {
   function start() {
     bindLogin();
     autoLoginIfRemembered();
+    showIosInstallHintIfNeeded();
+  }
+
+  function showIosInstallHintIfNeeded() {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
+    const dismissed = localStorage.getItem('wedplan:ios-hint-dismissed');
+    if (!isIOS || isStandalone || dismissed) return;
+
+    const hint = document.getElementById('ios-install-hint');
+    if (!hint) return;
+    setTimeout(() => hint.classList.remove('hidden'), 1500);
+    document.getElementById('iih-close').addEventListener('click', () => {
+      hint.classList.add('hidden');
+      localStorage.setItem('wedplan:ios-hint-dismissed', '1');
+    });
   }
 
   // -------- LOGIN --------
@@ -529,8 +545,30 @@ const App = (() => {
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       deferredPrompt = e;
-      // Could show a custom button here later.
+      // Show a subtle Install button in the proximity-banner area
+      showInstallChip();
     });
+    window.addEventListener('appinstalled', () => {
+      deferredPrompt = null;
+      const chip = document.getElementById('install-chip');
+      if (chip) chip.remove();
+    });
+  }
+
+  function showInstallChip() {
+    if (document.getElementById('install-chip')) return;
+    const chip = document.createElement('button');
+    chip.id = 'install-chip';
+    chip.className = 'install-chip';
+    chip.innerHTML = '📲 앱으로 설치';
+    chip.addEventListener('click', async () => {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      const result = await deferredPrompt.userChoice;
+      if (result.outcome === 'accepted') chip.remove();
+      deferredPrompt = null;
+    });
+    document.body.appendChild(chip);
   }
 
   function formatTime(ts) {

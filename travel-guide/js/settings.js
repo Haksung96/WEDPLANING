@@ -87,10 +87,16 @@ const Settings = (() => {
       </div>
 
       <div class="settings-card">
-        <h4>🔗 트립 공유</h4>
-        <p class="setting-hint">상대방 핸드폰에서 같은 코드를 입력하면 동기화됩니다.</p>
-        <p>현재 트립 코드: <strong>${esc(Sync.getUser().tripCode)}</strong></p>
-        <button id="set-share" class="btn-secondary">현재 URL 공유 / 복사</button>
+        <h4>📱 핸드폰에 설치 / 와이프와 공유</h4>
+        <p class="setting-hint">QR을 와이프 핸드폰으로 스캔하면 같은 앱이 열립니다. 하단 공유 → 홈 화면에 추가하면 1-클릭 실행 앱처럼 사용 가능.</p>
+        <div class="qr-box">
+          <img id="set-qr-img" src="" alt="QR 코드" />
+          <div class="qr-info">
+            <div><strong>트립 코드</strong>: <code>${esc(Sync.getUser().tripCode)}</code></div>
+            <button id="set-share" class="btn-secondary" style="margin-top:8px;">URL 공유 / 복사</button>
+            <a href="install.html" id="set-install-page" class="btn-secondary" style="margin-top:8px; display:inline-block; text-decoration:none;">설치 가이드 열기</a>
+          </div>
+        </div>
       </div>
 
       <div class="settings-buttons">
@@ -104,6 +110,13 @@ const Settings = (() => {
     const root = document.getElementById('view-settings');
     if (!root) return;
     root.innerHTML = render();
+
+    // Render QR code (free public API - no key required)
+    const qrImg = document.getElementById('set-qr-img');
+    if (qrImg) {
+      const url = location.origin + location.pathname.replace(/index\.html.*$/, '');
+      qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=8&data=${encodeURIComponent(url)}`;
+    }
 
     document.getElementById('set-fb-parse')?.addEventListener('click', () => {
       const ta = document.getElementById('set-fb-paste');
