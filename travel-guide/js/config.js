@@ -14,12 +14,12 @@ const CONFIG = {
   // Firestore 활성화 필요
   // (값을 비워두면 로컬 모드로 동작 — 같은 기기 안에서만 동기화됨)
   FIREBASE: {
-    apiKey: '',
-    authDomain: '',
-    projectId: '',
-    storageBucket: '',
-    messagingSenderId: '',
-    appId: '',
+    apiKey: 'AIzaSyAlvpKXDGWV7_53pKJE3NT0XJ_lGSxjG_E',
+    authDomain: 'wedplaning-50226.firebaseapp.com',
+    projectId: 'wedplaning-50226',
+    storageBucket: 'wedplaning-50226.firebasestorage.app',
+    messagingSenderId: '665927444917',
+    appId: '1:665927444917:web:9eaf82e82a3368ee9991fc',
   },
 
   // 근접 알림 — 이 거리(미터) 안에 들어오면 일정 안내
