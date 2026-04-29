@@ -6,29 +6,41 @@
 
 ---
 
-## 🚀 핸드폰에서 1-클릭으로 쓰기 — 두 가지 길
+## 🚀 핸드폰에서 1-클릭으로 쓰기
 
-### 🅰️ GitHub Pages (Repo Public 필수)
+### 🥇 추천 방법: Netlify (1분 · GitHub 클릭만)
 
-**먼저 한 번만 설정**:
-1. https://github.com/Haksung96/WEDPLANING/settings → 맨 아래 **Change visibility → Make public**
-   *(GitHub 무료 플랜은 Private Repo에서 Pages 사용 불가)*
-2. https://github.com/Haksung96/WEDPLANING/settings/pages → **Source: GitHub Actions** 선택
+가장 간단합니다. GitHub Settings 안 만져도 되고, Public/Private 둘 다 OK.
 
-이후 push 할 때마다 자동 배포됩니다.
+| Step | 동작 |
+|------|------|
+| 1 | https://app.netlify.com/start 접속 |
+| 2 | **GitHub** 버튼 클릭 → Authorize |
+| 3 | **WEDPLANING** repo 선택 |
+| 4 | Build settings 자동으로 채워짐 (`netlify.toml` 인식) → **Deploy site** 클릭 |
+| 5 | 1~2분 후 `https://xxxxx.netlify.app` URL 발급 |
 
-배포 URL:
+발급된 URL을 핸드폰으로 열고 **공유 → 홈 화면에 추가**하면 끝.
+
+> 사이트 이름은 Netlify Site settings → **Change site name** 으로 원하는 걸로 (예: `wedplaning.netlify.app`)
+
+---
+
+### 🥈 대안: GitHub Pages (1회 설정 필요)
+
+⚠️ **반드시 두 가지 모두 설정해야 작동합니다**:
+
+| Step | 동작 | URL |
+|------|------|-----|
+| 1 | Repo를 **Public** 으로 전환 (이미 완료) | [Settings](https://github.com/Haksung96/WEDPLANING/settings) → 맨 아래 Change visibility |
+| 2 | **Pages 소스를 GitHub Actions로 설정** | [Settings → Pages](https://github.com/Haksung96/WEDPLANING/settings/pages) → Source: **GitHub Actions** 선택 |
+| 3 | 푸시될 때마다 자동 배포 (수동 추가 작업 없음) | — |
+
+설정 완료 후 URL:
 - **앱**: https://haksung96.github.io/WEDPLANING/
 - **설치 가이드**: https://haksung96.github.io/WEDPLANING/install.html
 
-### 🅱️ Netlify (Private Repo에서도 무료, 추천)
-
-1. https://app.netlify.com/start 접속 → GitHub 로그인
-2. **Import existing project** → GitHub → `WEDPLANING` 선택
-3. 자동으로 `netlify.toml` 읽어서 `travel-guide/` 폴더 배포
-4. 1~2분 후 `xxxxx.netlify.app` URL 발급 → 즉시 사용 가능
-
-> 💡 Repo가 private인 채로 그대로 둘 수 있고, 커스텀 도메인도 무료.
+> ⚠️ Step 2를 빼먹으면 워크플로우는 계속 `Configure Pages` 단계에서 실패합니다.
 
 ---
 

@@ -382,10 +382,20 @@ input, textarea, select {
   background: var(--bg-card);
   padding: 16px;
   border-radius: 14px;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
-.day-header h3 { font-size: 18px; margin-bottom: 4px; }
-.day-header .day-sub { color: var(--text-muted); font-size: 13px; margin-bottom: 8px; }
+.day-header h3 {
+  font-size: 19px;
+  margin-bottom: 4px;
+  word-break: keep-all;
+  line-height: 1.3;
+}
+.day-header .day-sub {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin-bottom: 8px;
+  word-break: keep-all;
+}
 .day-header .day-tip {
   background: var(--bg-elev);
   padding: 10px;
@@ -404,9 +414,13 @@ input, textarea, select {
   display: flex;
   gap: 12px;
   border-left: 4px solid var(--border);
-  transition: transform 0.1s;
+  transition: transform 0.1s, background 0.15s;
+  -webkit-tap-highlight-color: transparent;
 }
-.event-card:active { transform: scale(0.98); }
+.event-card:active {
+  transform: scale(0.985);
+  background: var(--bg-elev);
+}
 
 .event-card.tag-food { border-left-color: #fb7185; }
 .event-card.tag-walk { border-left-color: #60a5fa; }
@@ -494,8 +508,17 @@ input, textarea, select {
 
 /* ========== CHECKLIST VIEW ========== */
 .section-header { margin-bottom: 16px; }
-.section-header h3 { font-size: 18px; margin-bottom: 4px; }
-.section-header p { color: var(--text-muted); font-size: 13px; }
+.section-header h3 {
+  font-size: 20px;
+  margin-bottom: 6px;
+  word-break: keep-all;
+}
+.section-header p {
+  color: var(--text-muted);
+  font-size: 13.5px;
+  line-height: 1.5;
+  word-break: keep-all;
+}
 
 .checklist-category {
   background: var(--bg-card);
@@ -621,17 +644,19 @@ input, textarea, select {
   margin-bottom: 12px;
 }
 .tip-category h4 {
-  font-size: 15px;
+  font-size: 16px;
   margin-bottom: 10px;
+  word-break: keep-all;
 }
 .tip-category ul { list-style: none; }
 .tip-category li {
-  padding: 8px 0;
+  padding: 10px 0;
   border-bottom: 1px solid var(--border);
-  font-size: 14px;
+  font-size: 14.5px;
   line-height: 1.6;
   padding-left: 20px;
   position: relative;
+  word-break: keep-all;
 }
 .tip-category li:last-child { border-bottom: none; }
 .tip-category li::before {
