@@ -1,6 +1,6 @@
 // Service Worker — offline cache for app shell
 
-const CACHE_NAME = 'wedplan-v6';
+const CACHE_NAME = 'wedplan-v7';
 const APP_SHELL = [
   './',
   './index.html',
@@ -40,6 +40,14 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
+// Files that should always come from network when online (so changes apply
+// on the very next reload instead of the second reload).
+const NETWORK_FIRST = ['/js/config.js', '/index.html', '/'];
+
+function isNetworkFirst(url) {
+  return NETWORK_FIRST.some((p) => url.pathname === p || url.pathname.endsWith(p));
+}
+
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
@@ -51,21 +59,37 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Stale-while-revalidate for app shell
-  if (event.request.method === 'GET' && url.origin === location.origin) {
+  if (event.request.method !== 'GET' || url.origin !== location.origin) return;
+
+  // Network-first for config and app shell entry — keeps fresh keys/HTML.
+  if (isNetworkFirst(url)) {
     event.respondWith(
-      caches.match(event.request).then((cached) => {
-        const network = fetch(event.request)
-          .then((res) => {
-            if (res && res.status === 200 && res.type === 'basic') {
-              const clone = res.clone();
-              caches.open(CACHE_NAME).then((c) => c.put(event.request, clone));
-            }
-            return res;
-          })
-          .catch(() => cached);
-        return cached || network;
-      })
+      fetch(event.request)
+        .then((res) => {
+          if (res && res.status === 200 && res.type === 'basic') {
+            const clone = res.clone();
+            caches.open(CACHE_NAME).then((c) => c.put(event.request, clone));
+          }
+          return res;
+        })
+        .catch(() => caches.match(event.request))
     );
+    return;
   }
+
+  // Stale-while-revalidate for everything else
+  event.respondWith(
+    caches.match(event.request).then((cached) => {
+      const network = fetch(event.request)
+        .then((res) => {
+          if (res && res.status === 200 && res.type === 'basic') {
+            const clone = res.clone();
+            caches.open(CACHE_NAME).then((c) => c.put(event.request, clone));
+          }
+          return res;
+        })
+        .catch(() => cached);
+      return cached || network;
+    })
+  );
 });
