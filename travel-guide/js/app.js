@@ -99,6 +99,13 @@ const App = (() => {
       renderTodayView();
     });
 
+    // Subscribe to event time/place edits (overrides) — when these update,
+    // re-render today AND tell MapView so markers/route refresh too.
+    EventEditor.init(() => {
+      renderTodayView();
+      MapView.setDayIndex(currentDayIndex);
+    });
+
     // Proximity dismiss
     document.getElementById('proximity-dismiss').addEventListener('click', () => {
       MapView.dismissBanner();
@@ -250,6 +257,11 @@ const App = (() => {
     const day = TRIP.days[currentDayIndex];
     if (!day) return;
 
+    // Apply user-edited overrides to event list (time/place edits sync via Firebase)
+    const events = typeof EventEditor !== 'undefined'
+      ? EventEditor.applyOverrides(day, day.events)
+      : day.events;
+
     const todayStr = new Date().toISOString().slice(0, 10);
     const isToday = day.date === todayStr;
     const nowMin = nowMinutes();
@@ -257,7 +269,7 @@ const App = (() => {
     // Compute active/next event indices (only meaningful for "today")
     let activeIdx = -1, nextIdx = -1;
     if (isToday) {
-      day.events.forEach((evt, i) => {
+      events.forEach((evt, i) => {
         const m = parseTimeToMin(evt.time);
         if (m == null) return;
         if (m <= nowMin) activeIdx = i;
@@ -268,7 +280,7 @@ const App = (() => {
     const header = document.getElementById('day-header');
     let nextBadge = '';
     if (isToday && nextIdx >= 0) {
-      const nextEvt = day.events[nextIdx];
+      const nextEvt = events[nextIdx];
       const minsUntil = parseTimeToMin(nextEvt.time) - nowMin;
       nextBadge = `<div class="next-up">⏭️ 다음: <strong>${esc(nextEvt.time)} ${esc(nextEvt.title)}</strong> · ${formatCountdown(minsUntil)} 후</div>`;
     }
@@ -297,7 +309,7 @@ const App = (() => {
 
     const list = document.getElementById('events-list');
     list.innerHTML = '';
-    day.events.forEach((evt, i) => {
+    events.forEach((evt, i) => {
       const key = `${day.date}-${i}`;
       const done = !!(progress[key] && progress[key].done);
       const isActive = isToday && i === activeIdx && !done;
@@ -308,19 +320,24 @@ const App = (() => {
       if (done) cls.push('completed');
       if (isActive) cls.push('active');
       if (isNext) cls.push('next');
+      if (evt._edited) cls.push('edited');
       card.className = cls.join(' ');
 
       const updatedBy = progress[key] && progress[key]._updatedBy ? progress[key]._updatedBy : null;
       const stateBadge = isActive ? '<span class="state-badge now">진행중</span>' :
                          isNext ? '<span class="state-badge next">다음</span>' : '';
+      const editedBadge = evt._edited
+        ? `<span class="state-badge edited" title="${esc(evt._editedBy || '')}님이 편집">✏️ 편집됨</span>`
+        : '';
       card.innerHTML = `
         <div class="event-time">${esc(evt.time)}</div>
         <div class="event-body">
-          <div class="event-title">${stateBadge}${esc(evt.title)}</div>
+          <div class="event-title">${stateBadge}${editedBadge}${esc(evt.title)}</div>
           ${evt.desc ? `<div class="event-desc">${esc(evt.desc)}</div>` : ''}
           ${evt.location ? `<div class="event-desc" style="margin-top:6px;">📍 ${esc(evt.location.name)}</div>` : ''}
           <div class="event-actions">
             <button class="pill-btn ${done ? 'done' : ''}" data-toggle="${key}">${done ? `✓ 완료${updatedBy ? ' · ' + esc(updatedBy) : ''}` : '완료 체크'}</button>
+            <button class="pill-btn" data-edit="${i}">✏️ 편집</button>
             ${evt.location ? `<button class="pill-btn" data-nav='${JSON.stringify(evt.location).replace(/'/g, "&#39;")}'>🗺️ 지도</button>` : ''}
             ${evt.location ? `<button class="pill-btn primary" data-route='${JSON.stringify(evt.location).replace(/'/g, "&#39;")}'>🚦 경로</button>` : ''}
             ${evt.location ? `<button class="pill-btn" data-gmap='${JSON.stringify(evt.location).replace(/'/g, "&#39;")}'>↗️ Google 지도에서 보기</button>` : ''}
@@ -360,6 +377,13 @@ const App = (() => {
           const loc = JSON.parse(btn.dataset.route.replace(/&#39;/g, "'"));
           if (typeof Directions !== 'undefined') Directions.open(loc);
         } catch (err) { console.warn(err); }
+      });
+    });
+    list.querySelectorAll('[data-edit]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const idx = Number(btn.dataset.edit);
+        const evt = events[idx];
+        if (typeof EventEditor !== 'undefined') EventEditor.open(day, idx, evt);
       });
     });
   }

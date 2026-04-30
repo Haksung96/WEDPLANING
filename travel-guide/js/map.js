@@ -189,8 +189,13 @@ const MapView = (() => {
       map.setZoom(13);
     }
 
+    // Apply user-edited overrides so the map reflects edits made in Today view
+    const events = typeof EventEditor !== 'undefined'
+      ? EventEditor.applyOverrides(day, day.events)
+      : day.events;
+
     const bounds = new google.maps.LatLngBounds();
-    const eventsWithLocation = day.events.filter((e) => e.location);
+    const eventsWithLocation = events.filter((e) => e.location);
 
     eventsWithLocation.forEach((evt, i) => {
       const pos = { lat: evt.location.lat, lng: evt.location.lng };
