@@ -329,8 +329,12 @@ const App = (() => {
       const editedBadge = evt._edited
         ? `<span class="state-badge edited" title="${esc(evt._editedBy || '')}님이 편집">✏️ 편집됨</span>`
         : '';
+      const numberBadge = `<span class="event-num" style="background:${tagColor(evt.tag)}">${i + 1}</span>`;
       card.innerHTML = `
-        <div class="event-time">${esc(evt.time)}</div>
+        <div class="event-time">
+          ${numberBadge}
+          <div>${esc(evt.time)}</div>
+        </div>
         <div class="event-body">
           <div class="event-title">${stateBadge}${editedBadge}${esc(evt.title)}</div>
           ${evt.desc ? `<div class="event-desc">${esc(evt.desc)}</div>` : ''}
@@ -729,6 +733,15 @@ const App = (() => {
 
   function getCurrentDayIndex() {
     return currentDayIndex;
+  }
+
+  // Same palette as map.js so number badges & map markers stay color-aligned
+  function tagColor(tag) {
+    return ({
+      food: '#fb7185', walk: '#60a5fa', shop: '#c084fc',
+      attraction: '#fbbf24', hotel: '#4ade80', cruise: '#06b6d4',
+      transport: '#94a3b8', flight: '#f43f5e', rest: '#a78bfa',
+    }[tag] || '#ff6b9d');
   }
 
   return { start, getCurrentDayIndex };

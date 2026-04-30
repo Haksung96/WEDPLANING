@@ -195,18 +195,23 @@ const MapView = (() => {
       : day.events;
 
     const bounds = new google.maps.LatLngBounds();
-    const eventsWithLocation = events.filter((e) => e.location);
+    // Iterate over the FULL events array so the marker number stays equal
+    // to the card's number in the Today view (i.e. event.indexInDay + 1),
+    // even when some events have no location (those are simply skipped).
+    const routePoints = [];
 
-    eventsWithLocation.forEach((evt, i) => {
+    events.forEach((evt, i) => {
+      if (!evt.location) return;
+      const number = i + 1;
       const pos = { lat: evt.location.lat, lng: evt.location.lng };
+      routePoints.push(evt);
 
-      // Custom numbered marker as inline SVG data URI
-      const markerSvg = createNumberedMarker(i + 1, tagColor(evt.tag));
+      const markerSvg = createNumberedMarker(number, tagColor(evt.tag));
 
       const marker = new google.maps.Marker({
         position: pos,
         map,
-        title: `${evt.time} ${evt.title}`,
+        title: `${number}. ${evt.time} ${evt.title}`,
         icon: {
           url: markerSvg,
           scaledSize: new google.maps.Size(36, 44),
@@ -222,7 +227,7 @@ const MapView = (() => {
         content: `
           <div style="padding:6px; min-width:200px;">
             <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
-              <span style="background:${tagColor(evt.tag)}; color:white; width:22px; height:22px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-weight:700; font-size:12px;">${i + 1}</span>
+              <span style="background:${tagColor(evt.tag)}; color:white; width:22px; height:22px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-weight:700; font-size:12px;">${number}</span>
               <strong>${escape(evt.time)} · ${escape(evt.title)}</strong>
             </div>
             <div style="font-size: 12px; color:#666;">📍 ${escape(evt.location.name)}</div>
@@ -259,9 +264,9 @@ const MapView = (() => {
       bounds.extend(pos);
     });
 
-    // Draw route connecting events in order
-    if (eventsWithLocation.length >= 2) {
-      drawRoute(eventsWithLocation);
+    // Draw route connecting events in time order (skipping numberless gaps)
+    if (routePoints.length >= 2) {
+      drawRoute(routePoints);
     }
 
     if (lastPosition) bounds.extend(lastPosition);

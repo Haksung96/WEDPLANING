@@ -514,10 +514,28 @@ input, textarea, select {
   font-weight: 800;
   font-size: 14px;
   color: var(--primary);
-  min-width: 60px;
-  text-align: right;
+  min-width: 56px;
+  text-align: center;
   letter-spacing: -0.2px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
 }
+.event-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  color: white;
+  font-weight: 800;
+  font-size: 13px;
+  line-height: 1;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+.event-card.completed .event-num { opacity: 0.5; }
 
 .event-body { flex: 1; min-width: 0; }
 .event-title {
