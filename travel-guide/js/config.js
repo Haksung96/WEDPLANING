@@ -8,7 +8,7 @@ const CONFIG = {
   // 발급: https://console.cloud.google.com/google/maps-apis
   // (Maps JavaScript API + Directions API 활성화 필요)
   // HTTP referrer로 도메인 제한되어 있어 외부 유출되어도 우리 사이트에서만 작동.
-  GOOGLE_MAPS_API_KEY: 'AIzaSyDS4wrPNKHia6vZ-yYCNCpAuzlUXK1X330',
+  GOOGLE_MAPS_API_KEY: 'AIzaSyCnU5Fmw9ixu3y6cYXYcE17uqrZ6s3EZ_M',
 
   // Firebase Web SDK config
   // 발급: https://console.firebase.google.com/ → 프로젝트 만들기 → 웹 앱 추가
