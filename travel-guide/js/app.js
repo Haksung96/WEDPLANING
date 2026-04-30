@@ -322,7 +322,7 @@ const App = (() => {
           <div class="event-actions">
             <button class="pill-btn ${done ? 'done' : ''}" data-toggle="${key}">${done ? `✓ 완료${updatedBy ? ' · ' + esc(updatedBy) : ''}` : '완료 체크'}</button>
             ${evt.location ? `<button class="pill-btn" data-nav='${JSON.stringify(evt.location).replace(/'/g, "&#39;")}'>🗺️ 지도</button>` : ''}
-            ${evt.location ? `<button class="pill-btn" data-gmap='${JSON.stringify(evt.location).replace(/'/g, "&#39;")}'>↗️ Google 길찾기</button>` : ''}
+            ${evt.location ? `<button class="pill-btn" data-gmap='${JSON.stringify(evt.location).replace(/'/g, "&#39;")}'>↗️ Google 지도에서 보기</button>` : ''}
           </div>
         </div>
       `;
@@ -394,9 +394,12 @@ const App = (() => {
   }
 
   function openGoogleMaps(location) {
-    // Use directions API from current location → destination, default walking
-    const dest = encodeURIComponent(`${location.lat},${location.lng}`);
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${dest}&destination_place_id=${encodeURIComponent(location.name)}&travelmode=walking`;
+    // Open the destination as a "place" on Google Maps. Google's own UI
+    // can then offer "Directions from current location" — which only works
+    // when the user is actually nearby. Trying to force `dir/` mode here
+    // throws "no route found" pre-trip when origin (Korea) and destination
+    // (e.g. Marseille) are on different continents.
+    const url = `https://www.google.com/maps/search/?api=1&query=${location.lat},${location.lng}&query_place_id=${encodeURIComponent(location.name)}`;
     window.open(url, '_blank');
   }
 
