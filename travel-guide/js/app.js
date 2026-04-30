@@ -394,12 +394,16 @@ const App = (() => {
   }
 
   function openGoogleMaps(location) {
-    // Open the destination as a "place" on Google Maps. Google's own UI
-    // can then offer "Directions from current location" — which only works
-    // when the user is actually nearby. Trying to force `dir/` mode here
-    // throws "no route found" pre-trip when origin (Korea) and destination
-    // (e.g. Marseille) are on different continents.
-    const url = `https://www.google.com/maps/search/?api=1&query=${location.lat},${location.lng}&query_place_id=${encodeURIComponent(location.name)}`;
+    // Search by place NAME so Google Maps shows the place card (reviews,
+    // photos, hours, transit/taxi options) instead of just dropping a pin
+    // at coords. We append the city for disambiguation, and fall back to
+    // the lat/lng pair if no name is available.
+    const day = TRIP.days[currentDayIndex];
+    const cityHint = day && day.city ? ' ' + day.city : '';
+    const query = location.name
+      ? `${location.name}${cityHint}`
+      : `${location.lat},${location.lng}`;
+    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
     window.open(url, '_blank');
   }
 

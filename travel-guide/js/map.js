@@ -210,6 +210,8 @@ const MapView = (() => {
         zIndex: 100 + i,
       });
 
+      const cityHint = day.city ? ' ' + day.city : '';
+      const placeQuery = encodeURIComponent(`${evt.location.name}${cityHint}`);
       const info = new google.maps.InfoWindow({
         content: `
           <div style="padding:6px; min-width:200px;">
@@ -219,10 +221,10 @@ const MapView = (() => {
             </div>
             <div style="font-size: 12px; color:#666;">📍 ${escape(evt.location.name)}</div>
             ${evt.desc ? `<p style="margin-top:6px; font-size: 12px; line-height:1.4;">${escape(evt.desc)}</p>` : ''}
-            <a href="https://www.google.com/maps/dir/?api=1&destination=${pos.lat},${pos.lng}&travelmode=walking"
+            <a href="https://www.google.com/maps/search/?api=1&query=${placeQuery}"
                target="_blank"
                style="display:inline-block; margin-top:8px; font-size:12px; color:#ff6b9d; font-weight:700;">
-              ↗️ Google 길찾기
+              ↗️ Google 지도에서 보기
             </a>
           </div>
         `,
