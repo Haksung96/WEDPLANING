@@ -212,6 +212,7 @@ const MapView = (() => {
 
       const cityHint = day.city ? ' ' + day.city : '';
       const placeQuery = encodeURIComponent(`${evt.location.name}${cityHint}`);
+      const locJson = JSON.stringify(evt.location).replace(/'/g, "&#39;").replace(/"/g, '&quot;');
       const info = new google.maps.InfoWindow({
         content: `
           <div style="padding:6px; min-width:200px;">
@@ -221,15 +222,34 @@ const MapView = (() => {
             </div>
             <div style="font-size: 12px; color:#666;">📍 ${escape(evt.location.name)}</div>
             ${evt.desc ? `<p style="margin-top:6px; font-size: 12px; line-height:1.4;">${escape(evt.desc)}</p>` : ''}
-            <a href="https://www.google.com/maps/search/?api=1&query=${placeQuery}"
-               target="_blank"
-               style="display:inline-block; margin-top:8px; font-size:12px; color:#ff6b9d; font-weight:700;">
-              ↗️ Google 지도에서 보기
-            </a>
+            <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
+              <button data-iw-route='${locJson}'
+                      style="background:#ff6b9d; color:white; border:none; border-radius:14px; padding:6px 12px; font-size:12px; font-weight:700; cursor:pointer;">
+                🚦 경로
+              </button>
+              <a href="https://www.google.com/maps/search/?api=1&query=${placeQuery}"
+                 target="_blank"
+                 style="display:inline-block; font-size:12px; color:#ff6b9d; font-weight:700; align-self:center;">
+                ↗️ Google 지도
+              </a>
+            </div>
           </div>
         `,
       });
-      marker.addListener('click', () => info.open(map, marker));
+      marker.addListener('click', () => {
+        info.open(map, marker);
+        // Wire the route button after the InfoWindow renders
+        google.maps.event.addListenerOnce(info, 'domready', () => {
+          const btn = document.querySelector('[data-iw-route]');
+          if (!btn) return;
+          btn.addEventListener('click', () => {
+            try {
+              const loc = JSON.parse(btn.dataset.iwRoute.replace(/&#39;/g, "'").replace(/&quot;/g, '"'));
+              if (typeof Directions !== 'undefined') Directions.open(loc);
+            } catch (err) { console.warn(err); }
+          });
+        });
+      });
       eventMarkers.push(marker);
       bounds.extend(pos);
     });
@@ -480,5 +500,9 @@ const MapView = (() => {
     ];
   }
 
-  return { init, setDayIndex, dismissBanner };
+  function getLastPosition() {
+    return lastPosition ? { lat: lastPosition.lat, lng: lastPosition.lng } : null;
+  }
+
+  return { init, setDayIndex, dismissBanner, getLastPosition };
 })();

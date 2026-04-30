@@ -322,6 +322,7 @@ const App = (() => {
           <div class="event-actions">
             <button class="pill-btn ${done ? 'done' : ''}" data-toggle="${key}">${done ? `✓ 완료${updatedBy ? ' · ' + esc(updatedBy) : ''}` : '완료 체크'}</button>
             ${evt.location ? `<button class="pill-btn" data-nav='${JSON.stringify(evt.location).replace(/'/g, "&#39;")}'>🗺️ 지도</button>` : ''}
+            ${evt.location ? `<button class="pill-btn primary" data-route='${JSON.stringify(evt.location).replace(/'/g, "&#39;")}'>🚦 경로</button>` : ''}
             ${evt.location ? `<button class="pill-btn" data-gmap='${JSON.stringify(evt.location).replace(/'/g, "&#39;")}'>↗️ Google 지도에서 보기</button>` : ''}
           </div>
         </div>
@@ -350,6 +351,14 @@ const App = (() => {
         try {
           const loc = JSON.parse(btn.dataset.gmap.replace(/&#39;/g, "'"));
           openGoogleMaps(loc);
+        } catch (err) { console.warn(err); }
+      });
+    });
+    list.querySelectorAll('[data-route]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        try {
+          const loc = JSON.parse(btn.dataset.route.replace(/&#39;/g, "'"));
+          if (typeof Directions !== 'undefined') Directions.open(loc);
         } catch (err) { console.warn(err); }
       });
     });
@@ -694,7 +703,11 @@ const App = (() => {
     }[c]));
   }
 
-  return { start };
+  function getCurrentDayIndex() {
+    return currentDayIndex;
+  }
+
+  return { start, getCurrentDayIndex };
 })();
 
 // Boot
