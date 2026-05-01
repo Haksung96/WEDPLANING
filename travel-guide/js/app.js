@@ -51,6 +51,17 @@ const App = (() => {
     const name = document.getElementById('user-name').value;
     const tripCode = document.getElementById('trip-code').value.trim();
     if (!tripCode) { alert('트립 코드를 입력하세요'); return; }
+    // Warn if an existing local session used the same name — implies both
+    // phones might collide on the same presence key.
+    const prev = localStorage.getItem('wedplan:user');
+    if (prev) {
+      try {
+        const prevUser = JSON.parse(prev);
+        if (prevUser.name === name && prevUser.tripCode === tripCode) {
+          // Same session reload — fine
+        }
+      } catch {}
+    }
     localStorage.setItem('wedplan:user', JSON.stringify({ name, tripCode }));
     doLogin(name, tripCode);
   }
@@ -93,15 +104,22 @@ const App = (() => {
     // Default to today (or trip start if today is outside range)
     setActiveDay(getDefaultDayIndex());
 
-    // Subscribe to per-event progress (event check-offs)
+    // Subscribe to per-event progress (event check-offs).
+    // Push the progress map into MapView so completed legs disappear from
+    // the route polyline live (Task 4).
     Sync.subscribe('progress', (items) => {
       progress = items;
       renderTodayView();
+      if (typeof MapView !== 'undefined' && MapView.setProgress) {
+        MapView.setProgress(progress);
+      }
     });
 
-    // Subscribe to event time/place edits (overrides) — when these update,
-    // re-render today AND tell MapView so markers/route refresh too.
+    // Subscribe to event time/place edits, inserts, deletes, day swaps —
+    // when any of these update, re-render today AND tell MapView so markers/
+    // route refresh too. EventEditor.init fires the callback for every channel.
     EventEditor.init(() => {
+      renderDayPills();
       renderTodayView();
       MapView.setDayIndex(currentDayIndex);
     });
@@ -191,12 +209,19 @@ const App = (() => {
   }
 
   // -------- DAY PILLS --------
+  // Effective date: TRIP.days[i].date with day-swap overrides applied.
+  function effectiveDate(day) {
+    return (typeof EventEditor !== 'undefined')
+      ? EventEditor.effectiveDate(day.date)
+      : day.date;
+  }
+
   function getDefaultDayIndex() {
     const today = new Date();
     const todayStr = today.toISOString().slice(0, 10);
-    const idx = TRIP.days.findIndex((d) => d.date === todayStr);
+    // Match by EFFECTIVE date so the "today" jump respects swaps.
+    const idx = TRIP.days.findIndex((d) => effectiveDate(d) === todayStr);
     if (idx >= 0) return idx;
-    // Before trip starts → first day. After trip → last day.
     if (today < new Date(TRIP.days[0].date)) return 0;
     return TRIP.days.length - 1;
   }
@@ -205,15 +230,27 @@ const App = (() => {
     const root = document.getElementById('day-selector');
     root.innerHTML = '';
     const todayStr = new Date().toISOString().slice(0, 10);
-    const todayIdx = TRIP.days.findIndex((d) => d.date === todayStr);
+    const todayIdx = TRIP.days.findIndex((d) => effectiveDate(d) === todayStr);
 
-    TRIP.days.forEach((day, i) => {
+    // Sort indices by effective date so swapped pairs appear in chronological
+    // order even after a swap. We render in that order but keep currentDayIndex
+    // pointing at the original TRIP.days index.
+    const sortedIdx = TRIP.days
+      .map((_, i) => i)
+      .sort((a, b) => effectiveDate(TRIP.days[a]).localeCompare(effectiveDate(TRIP.days[b])));
+
+    sortedIdx.forEach((i) => {
+      const day = TRIP.days[i];
+      const eff = effectiveDate(day);
+      const isSwapped = (typeof EventEditor !== 'undefined') && EventEditor.isDaySwapped(day.date);
       const pill = document.createElement('button');
       pill.className = 'day-pill';
       if (i === currentDayIndex) pill.classList.add('active');
-      if (day.date === todayStr) pill.classList.add('today');
-      const md = day.date.slice(5).replace('-', '/');
-      pill.innerHTML = `<span class="pill-date">${md}</span><span class="pill-day">(${day.weekday})</span>`;
+      if (eff === todayStr) pill.classList.add('today');
+      if (isSwapped) pill.classList.add('swapped');
+      const md = eff.slice(5).replace('-', '/');
+      const wd = weekdayOf(eff);
+      pill.innerHTML = `<span class="pill-date">${md}${isSwapped ? ' ⇄' : ''}</span><span class="pill-day">(${wd})</span>`;
       pill.addEventListener('click', () => setActiveDay(i));
       root.appendChild(pill);
     });
@@ -228,6 +265,35 @@ const App = (() => {
         jumpBtn.classList.add('hidden');
       }
     }
+  }
+
+  const WEEKDAYS_KO = ['일', '월', '화', '수', '목', '금', '토'];
+  function weekdayOf(dateStr) {
+    const d = new Date(dateStr + 'T12:00:00');
+    return WEEKDAYS_KO[d.getDay()];
+  }
+
+  function promptSwapDay(currentDayObj) {
+    const myEff = effectiveDate(currentDayObj);
+    const choices = TRIP.days.filter((d) => d.date !== currentDayObj.date);
+    if (!choices.length) return;
+    const list = choices.map((d, i) => {
+      const eff = effectiveDate(d);
+      const wd = weekdayOf(eff);
+      return `${i + 1}. ${eff} (${wd}) — ${d.title}`;
+    }).join('\n');
+    const input = prompt(
+      `[${myEff}] 일정을 어느 날짜와 교체할까요?\n` +
+      `번호를 입력하세요 (취소: 빈 칸).\n\n${list}`
+    );
+    if (!input) return;
+    const idx = Number(input) - 1;
+    if (Number.isNaN(idx) || idx < 0 || idx >= choices.length) {
+      alert('잘못된 번호입니다.');
+      return;
+    }
+    const target = choices[idx];
+    EventEditor.swapDayDates(currentDayObj.date, target.date);
   }
 
   function setActiveDay(i) {
@@ -263,7 +329,9 @@ const App = (() => {
       : day.events;
 
     const todayStr = new Date().toISOString().slice(0, 10);
-    const isToday = day.date === todayStr;
+    const dayDate = effectiveDate(day);
+    const isToday = dayDate === todayStr;
+    const isSwapped = typeof EventEditor !== 'undefined' && EventEditor.isDaySwapped(day.date);
     const nowMin = nowMinutes();
 
     // Compute active/next event indices (only meaningful for "today")
@@ -284,12 +352,30 @@ const App = (() => {
       const minsUntil = parseTimeToMin(nextEvt.time) - nowMin;
       nextBadge = `<div class="next-up">⏭️ 다음: <strong>${esc(nextEvt.time)} ${esc(nextEvt.title)}</strong> · ${formatCountdown(minsUntil)} 후</div>`;
     }
+    const wd = weekdayOf(dayDate);
     header.innerHTML = `
-      <h3>${esc(day.title)}${isToday ? ' <span class="now-tag">NOW</span>' : ''}</h3>
-      <div class="day-sub">${esc(day.date)} (${esc(day.weekday)}) · ${esc(day.subtitle || '')}</div>
+      <h3>${esc(day.title)}${isToday ? ' <span class="now-tag">NOW</span>' : ''}${isSwapped ? ' <span class="swap-tag">⇄ 교체됨</span>' : ''}</h3>
+      <div class="day-sub">${esc(dayDate)} (${esc(wd)}) · ${esc(day.subtitle || '')}</div>
       ${day.tips ? `<div class="day-tip">💡 ${esc(day.tips)}</div>` : ''}
       ${nextBadge}
+      <div class="day-actions">
+        <button class="day-action-btn" id="day-swap-btn">⇄ 다른 날과 교체</button>
+        ${isSwapped ? '<button class="day-action-btn" id="day-unswap-btn">↺ 원래 날짜로</button>' : ''}
+        <button class="day-action-btn primary" id="day-add-event-btn">＋ 일정 추가</button>
+      </div>
     `;
+
+    document.getElementById('day-swap-btn').addEventListener('click', () => promptSwapDay(day));
+    document.getElementById('day-add-event-btn').addEventListener('click', () => {
+      if (typeof EventEditor !== 'undefined') EventEditor.openInsert(day);
+    });
+    const unswapBtn = document.getElementById('day-unswap-btn');
+    if (unswapBtn) {
+      unswapBtn.addEventListener('click', () => {
+        if (!confirm('이 날짜 교체를 해제하시겠습니까?')) return;
+        EventEditor.clearDaySwap(day.date);
+      });
+    }
 
     renderQuickGlance(day, isToday);
 
@@ -310,7 +396,9 @@ const App = (() => {
     const list = document.getElementById('events-list');
     list.innerHTML = '';
     events.forEach((evt, i) => {
-      const key = `${day.date}-${i}`;
+      // Use the stable per-event key (survives time edits / inserts) for
+      // progress and route lookups. Falls back to date+index for legacy data.
+      const key = evt._key || `${day.date}-${i}`;
       const done = !!(progress[key] && progress[key].done);
       const isActive = isToday && i === activeIdx && !done;
       const isNext = isToday && i === nextIdx;
@@ -345,6 +433,7 @@ const App = (() => {
             ${evt.location ? `<button class="pill-btn" data-nav='${JSON.stringify(evt.location).replace(/'/g, "&#39;")}'>🗺️ 지도</button>` : ''}
             ${evt.location ? `<button class="pill-btn primary" data-route='${JSON.stringify(evt.location).replace(/'/g, "&#39;")}'>🚦 경로</button>` : ''}
             ${evt.location ? `<button class="pill-btn" data-gmap='${JSON.stringify(evt.location).replace(/'/g, "&#39;")}'>↗️ Google 지도에서 보기</button>` : ''}
+            <button class="pill-btn danger" data-delete="${i}">🗑️ 삭제</button>
           </div>
         </div>
       `;
@@ -387,7 +476,16 @@ const App = (() => {
       btn.addEventListener('click', () => {
         const idx = Number(btn.dataset.edit);
         const evt = events[idx];
-        if (typeof EventEditor !== 'undefined') EventEditor.open(day, idx, evt);
+        if (typeof EventEditor !== 'undefined') EventEditor.open(day, evt);
+      });
+    });
+    list.querySelectorAll('[data-delete]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const idx = Number(btn.dataset.delete);
+        const evt = events[idx];
+        if (!evt) return;
+        if (!confirm(`"${evt.title}" 일정을 삭제하시겠습니까?`)) return;
+        EventEditor.deleteEvent(day, evt);
       });
     });
   }

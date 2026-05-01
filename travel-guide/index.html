@@ -30,7 +30,7 @@
         <option value="와이프">와이프</option>
       </select>
       <label>트립 코드 (둘이 같은 코드)</label>
-      <input id="trip-code" type="text" maxlength="20" placeholder="예: honeymoon2026" value="honeymoon2026" />
+      <input id="trip-code" type="password" maxlength="20" placeholder="우리 둘만의 코드" value="971003" />
       <button id="login-btn" class="btn-primary">시작하기</button>
       <a href="install.html" class="install-link">📱 핸드폰 홈 화면에 설치하기</a>
       <p class="hint">※ Firebase 미설정 시 로컬 모드로 동작합니다 (공유는 같은 기기 내에서만).</p>
@@ -111,6 +111,7 @@
       <!-- Map View -->
       <section id="view-map" class="view">
         <div id="map"></div>
+        <div id="partner-status" class="partner-status">💑 상대방 위치 대기 중...</div>
         <div id="map-status" class="map-status">위치 확인 중...</div>
       </section>
 

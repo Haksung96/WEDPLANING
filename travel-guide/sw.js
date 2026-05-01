@@ -1,6 +1,6 @@
 // Service Worker — offline cache for app shell
 
-const CACHE_NAME = 'wedplan-v10';
+const CACHE_NAME = 'wedplan-v11';
 const APP_SHELL = [
   './',
   './index.html',
@@ -22,6 +22,8 @@ const APP_SHELL = [
   './js/event-editor.js',
   './js/mobile.js',
   './js/app.js',
+  './icons/icon-192.png',
+  './icons/icon-512.png',
 ];
 
 self.addEventListener('install', (event) => {

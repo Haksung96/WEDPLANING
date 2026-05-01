@@ -7,7 +7,7 @@ const Sync = (() => {
   let listeners = [];
   let mode = 'local';   // 'firebase' | 'local'
   let unsubscribers = [];
-  let user = { name: '남편', tripCode: 'honeymoon2026' };
+  let user = { name: '남편', tripCode: '971003' };
 
   function init(opts) {
     user = { ...user, ...opts };
@@ -16,9 +16,20 @@ const Sync = (() => {
       try {
         if (!firebase.apps.length) firebase.initializeApp(CONFIG.FIREBASE);
         db = firebase.firestore();
+        // Enable IndexedDB persistence so reads/writes work offline and
+        // re-sync once connectivity returns. Must be called BEFORE any
+        // other Firestore call. Safe to fail (multi-tab returns 'failed-precondition').
+        try {
+          db.enablePersistence({ synchronizeTabs: true });
+        } catch (persistErr) {
+          // Older SDKs throw synchronously; newer ones return a promise — ignore.
+        }
         tripDoc = db.collection('trips').doc(user.tripCode);
         mode = 'firebase';
-        setStatus('online');
+        setStatus(navigator.onLine ? 'online' : 'offline');
+
+        window.addEventListener('online', () => setStatus('online'));
+        window.addEventListener('offline', () => setStatus('offline'));
       } catch (err) {
         console.warn('Firebase init failed, falling back to local:', err);
         mode = 'local';

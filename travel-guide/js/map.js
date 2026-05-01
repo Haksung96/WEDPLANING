@@ -7,7 +7,7 @@ const MapView = (() => {
   let partnerInfoWindow = null;
   let eventMarkers = [];
   let routeRenderers = [];     // DirectionsRenderer instances (one per leg)
-  let routePolyline = null;    // Fallback straight-line polyline
+  let routePolylines = [];     // Fallback straight-line polylines (one per leg)
   let watchId = null;
   let lastPosition = null;
   let mapsLoaded = false;
@@ -15,6 +15,26 @@ const MapView = (() => {
   let proximityNotified = new Set();
   let directionsService = null;
   let presenceStarted = false;
+  let progressMap = {};        // shared from App so completed legs can be hidden
+
+  // Per-leg color palette — distinct enough for adjacent segments to be
+  // visually separable. Cycles if there are more legs than colors.
+  const LEG_COLORS = [
+    '#ff6b9d', '#60a5fa', '#fbbf24', '#4ade80',
+    '#c084fc', '#fb7185', '#06b6d4', '#f59e0b',
+    '#a78bfa', '#34d399', '#f43f5e', '#3b82f6',
+  ];
+
+  function setProgress(p) {
+    progressMap = p || {};
+    // Re-draw routes only if map is alive and currently rendering a day
+    if (mapsLoaded) renderMarkersForDay();
+  }
+
+  function isDone(evt) {
+    if (!evt || !evt._key) return false;
+    return !!(progressMap[evt._key] && progressMap[evt._key].done);
+  }
 
   function init() {
     if (!isMapsConfigured()) {
@@ -86,91 +106,86 @@ const MapView = (() => {
   function clearRoute() {
     routeRenderers.forEach((r) => r.setMap(null));
     routeRenderers = [];
-    if (routePolyline) {
-      routePolyline.setMap(null);
-      routePolyline = null;
-    }
+    routePolylines.forEach((p) => p.setMap(null));
+    routePolylines = [];
   }
 
+  // Draw each consecutive pair (leg) as its own polyline with a distinct color.
+  // Skip legs whose BOTH endpoints are marked done — that's the "1+2 완료 → 1→2 사라짐" UX.
   function drawRoute(events) {
     clearRoute();
     if (!map || events.length < 2) return;
 
-    // Try Directions API first (gives real walking paths along streets)
-    drawRouteWithDirections(events).catch((err) => {
-      console.warn('Directions API failed, drawing straight-line route:', err);
-      drawStraightLineRoute(events);
-    });
+    for (let i = 0; i < events.length - 1; i++) {
+      const a = events[i];
+      const b = events[i + 1];
+      if (isDone(a) && isDone(b)) continue;
+      drawLeg(a, b, LEG_COLORS[i % LEG_COLORS.length]);
+    }
   }
 
-  async function drawRouteWithDirections(events) {
-    // Split into legs of consecutive locations
-    const positions = events.map((e) => ({ lat: e.location.lat, lng: e.location.lng }));
+  function drawLeg(eventA, eventB, color) {
+    const origin = { lat: eventA.location.lat, lng: eventA.location.lng };
+    const destination = { lat: eventB.location.lat, lng: eventB.location.lng };
 
-    // Use a single Directions request with waypoints (max 10 in free tier; we usually have <10)
-    const origin = positions[0];
-    const destination = positions[positions.length - 1];
-    const waypoints = positions.slice(1, -1).map((p) => ({ location: p, stopover: true }));
-
-    return new Promise((resolve, reject) => {
-      directionsService.route(
-        {
-          origin,
-          destination,
-          waypoints,
-          travelMode: google.maps.TravelMode.WALKING,
-          optimizeWaypoints: false,
-        },
-        (result, status) => {
-          if (status !== 'OK') {
-            // If WALKING fails (e.g., between cities), retry with DRIVING
-            if (status === 'ZERO_RESULTS') {
-              directionsService.route(
-                { origin, destination, waypoints, travelMode: google.maps.TravelMode.DRIVING, optimizeWaypoints: false },
-                (r2, s2) => s2 === 'OK' ? renderDirectionsResult(r2, resolve) : reject(new Error(s2))
-              );
-            } else {
-              reject(new Error(status));
-            }
-            return;
-          }
-          renderDirectionsResult(result, resolve);
+    directionsService.route(
+      {
+        origin,
+        destination,
+        travelMode: google.maps.TravelMode.WALKING,
+      },
+      (result, status) => {
+        if (status === 'OK') {
+          renderLegRenderer(result, color);
+          return;
         }
-      );
-    });
+        // For impossible walking legs (e.g. across the sea between port stops),
+        // fall back to driving, then to a dashed straight line.
+        if (status === 'ZERO_RESULTS') {
+          directionsService.route(
+            { origin, destination, travelMode: google.maps.TravelMode.DRIVING },
+            (r2, s2) => {
+              if (s2 === 'OK') renderLegRenderer(r2, color);
+              else drawStraightLeg(origin, destination, color);
+            }
+          );
+          return;
+        }
+        drawStraightLeg(origin, destination, color);
+      }
+    );
   }
 
-  function renderDirectionsResult(result, done) {
+  function renderLegRenderer(result, color) {
     const renderer = new google.maps.DirectionsRenderer({
       map,
       directions: result,
-      suppressMarkers: true,    // we draw our own numbered markers
+      suppressMarkers: true,
+      preserveViewport: true,
       polylineOptions: {
-        strokeColor: '#ff6b9d',
+        strokeColor: color,
         strokeWeight: 5,
         strokeOpacity: 0.85,
       },
     });
     routeRenderers.push(renderer);
-    if (done) done();
   }
 
-  function drawStraightLineRoute(events) {
-    if (!map) return;
-    const path = events.map((e) => ({ lat: e.location.lat, lng: e.location.lng }));
-    routePolyline = new google.maps.Polyline({
-      path,
+  function drawStraightLeg(origin, destination, color) {
+    const line = new google.maps.Polyline({
+      path: [origin, destination],
       geodesic: true,
-      strokeColor: '#ff6b9d',
-      strokeOpacity: 0,    // dashed via icons
+      strokeColor: color,
+      strokeOpacity: 0,
       strokeWeight: 0,
       icons: [{
-        icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 3, strokeColor: '#ff6b9d' },
+        icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 3, strokeColor: color },
         offset: '0',
         repeat: '12px',
       }],
       map,
     });
+    routePolylines.push(line);
   }
 
   function renderMarkersForDay() {
@@ -206,17 +221,19 @@ const MapView = (() => {
       const pos = { lat: evt.location.lat, lng: evt.location.lng };
       routePoints.push(evt);
 
-      const markerSvg = createNumberedMarker(number, tagColor(evt.tag));
+      const done = isDone(evt);
+      const markerSvg = createNumberedMarker(number, tagColor(evt.tag), done);
 
       const marker = new google.maps.Marker({
         position: pos,
         map,
-        title: `${number}. ${evt.time} ${evt.title}`,
+        title: `${number}. ${evt.time} ${evt.title}${done ? ' ✓' : ''}`,
         icon: {
           url: markerSvg,
           scaledSize: new google.maps.Size(36, 44),
           anchor: new google.maps.Point(18, 44),
         },
+        opacity: done ? 0.55 : 1,
         zIndex: 100 + i,
       });
 
@@ -273,15 +290,20 @@ const MapView = (() => {
     if (!bounds.isEmpty()) map.fitBounds(bounds, 80);
   }
 
-  // Create a numbered pin marker as inline SVG data URI
-  function createNumberedMarker(number, color) {
+  // Create a numbered pin marker as inline SVG data URI.
+  // `done=true` renders a check mark over the number.
+  function createNumberedMarker(number, color, done) {
+    const numberOrCheck = done
+      ? `<text x="18" y="24" text-anchor="middle" font-family="-apple-system,Segoe UI,sans-serif"
+               font-size="16" font-weight="900" fill="${color}">✓</text>`
+      : `<text x="18" y="23" text-anchor="middle" font-family="-apple-system,Segoe UI,sans-serif"
+               font-size="14" font-weight="800" fill="${color}">${number}</text>`;
     const svg = `
       <svg xmlns="http://www.w3.org/2000/svg" width="36" height="44" viewBox="0 0 36 44">
         <path d="M18 0C8.06 0 0 8.06 0 18c0 13.5 18 26 18 26s18-12.5 18-26C36 8.06 27.94 0 18 0z"
               fill="${color}" stroke="white" stroke-width="2"/>
         <circle cx="18" cy="18" r="11" fill="white"/>
-        <text x="18" y="23" text-anchor="middle" font-family="-apple-system,Segoe UI,sans-serif"
-              font-size="14" font-weight="800" fill="${color}">${number}</text>
+        ${numberOrCheck}
       </svg>
     `.trim();
     return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
@@ -295,6 +317,16 @@ const MapView = (() => {
 
     setStatus('위치 권한 요청 중...');
 
+    // Even before our first GPS fix, listen for the partner so the badge
+    // updates when they appear (we'll just lack a "distance" value).
+    if (!presenceStarted && typeof Presence !== 'undefined') {
+      presenceStarted = true;
+      Presence.start(
+        () => lastPosition,
+        (partner) => updatePartnerMarker(partner)
+      );
+    }
+
     watchId = navigator.geolocation.watchPosition(
       (pos) => {
         lastPosition = {
@@ -305,30 +337,45 @@ const MapView = (() => {
         if (map) updateUserMarker();
         checkProximity();
         setStatus(`📍 현재 위치 추적 중 (정확도 ${Math.round(pos.coords.accuracy)}m)`);
-
-        // Start spouse-presence sharing once we have our first fix
-        if (!presenceStarted && typeof Presence !== 'undefined') {
-          presenceStarted = true;
-          Presence.start(
-            () => lastPosition,
-            (partner) => updatePartnerMarker(partner)
-          );
-        }
       },
       (err) => {
-        const msg = err.code === 1 ? '위치 권한이 거부되었습니다.' : '위치를 가져올 수 없습니다.';
+        const msg = err.code === 1
+          ? '위치 권한이 거부되었습니다. 설정 → 사이트 권한에서 허용 필요.'
+          : '위치를 가져올 수 없습니다.';
         setStatus(`⚠️ ${msg}`);
       },
       { enableHighAccuracy: true, maximumAge: 10000, timeout: 30000 }
     );
   }
 
+  function setPartnerStatus(html, kind) {
+    const el = document.getElementById('partner-status');
+    if (!el) return;
+    el.innerHTML = html;
+    el.className = 'partner-status ' + (kind || '');
+  }
+
   function updatePartnerMarker(partner) {
-    if (!map || !partner || partner.lat == null || partner.lng == null) {
+    if (!partner || partner.lat == null || partner.lng == null) {
+      // No partner yet — show a friendly hint so the user knows what to do
+      const me = (typeof Sync !== 'undefined') ? Sync.getUser().name : '나';
+      const other = me === '남편' ? '와이프' : '남편';
+      const mode = (typeof Sync !== 'undefined' && Sync.getMode) ? Sync.getMode() : 'local';
+      if (mode !== 'firebase') {
+        setPartnerStatus('💑 로컬 모드 — 위치 공유는 Firebase 설정 후 가능', 'warn');
+      } else {
+        setPartnerStatus(`💑 ${other} 위치 대기 중... (둘 다 로그인하고 위치 권한 허용 필요)`, 'wait');
+      }
       if (partnerMarker) {
         partnerMarker.setMap(null);
         partnerMarker = null;
       }
+      return;
+    }
+    if (!map) {
+      // Map not ready but presence arrived — at least update the status badge
+      const ageStr = Presence.formatAge(partner._updatedAt);
+      setPartnerStatus(`💑 ${escape(partner.name)} · ${escape(ageStr)}`, Presence.isStale(partner) ? 'stale' : 'live');
       return;
     }
 
@@ -383,8 +430,11 @@ const MapView = (() => {
       });
     }
 
-    // Show banner with distance/age in map status
-    setStatus(`💑 ${partner.name} 위치: ${ageStr}${distStr ? ' · ' + distStr + ' 거리' : ''}${stale ? ' · 오래됨' : ''}`);
+    // Update the dedicated partner-status badge
+    setPartnerStatus(
+      `💑 <strong>${escape(partner.name)}</strong> · ${escape(ageStr)}${distStr ? ' · ' + escape(distStr) + ' 거리' : ''}${stale ? ' · <em>오래됨</em>' : ''}`,
+      stale ? 'stale' : 'live'
+    );
   }
 
   function createPartnerMarker(name, stale) {
@@ -514,5 +564,5 @@ const MapView = (() => {
     return lastPosition ? { lat: lastPosition.lat, lng: lastPosition.lng } : null;
   }
 
-  return { init, setDayIndex, dismissBanner, getLastPosition };
+  return { init, setDayIndex, dismissBanner, getLastPosition, setProgress };
 })();

@@ -87,6 +87,20 @@ const Settings = (() => {
       </div>
 
       <div class="settings-card">
+        <h4>📡 오프라인 사용 가이드</h4>
+        <p class="setting-hint">크루즈에서 데이터 로밍이 비싸거나 끊길 때를 대비해:</p>
+        <ul class="offline-tips">
+          <li><strong>한 번이라도 앱을 켜둔 페이지</strong>는 오프라인 자동 캐시됨 (PWA Service Worker).</li>
+          <li><strong>일정·체크리스트·메모·지출</strong>은 오프라인에서도 입력/체크 가능. 다시 온라인이 되면 자동 동기화.</li>
+          <li><strong>지도 타일</strong>은 Google Maps 정책상 오프라인 캐시 불가 → 항구 도착 직후 와이파이 잡힐 때 미리 한 번씩 도시 지도를 둘러보면 일부 타일 캐시됨.</li>
+          <li><strong>장소 검색 / 경로</strong>은 인터넷 필요 — 호텔/카페 와이파이 활용.</li>
+          <li><strong>승선 전 한 번 모든 일정을 펼쳐 보기</strong> → JS·CSS·이미지가 SW 캐시에 들어가 비행기·바다 위에서도 일정/팁/회화 열람 가능.</li>
+          <li>크루즈 와이파이 패키지: MSC 'Browse' (메시지 + 기본 검색), 'Surf' (소셜·이메일 가능), 'Stream' (영상). 보통 'Browse' 면 충분.</li>
+          <li>유럽 eSIM (Airalo·Holafly·Ubigi) 미리 설치 → 항구 입항 시 즉시 데이터 사용.</li>
+        </ul>
+      </div>
+
+      <div class="settings-card">
         <h4>📱 핸드폰에 설치 / 와이프와 공유</h4>
         <p class="setting-hint">QR을 와이프 핸드폰으로 스캔하면 같은 앱이 열립니다. 하단 공유 → 홈 화면에 추가하면 1-클릭 실행 앱처럼 사용 가능.</p>
         <div class="qr-box">
