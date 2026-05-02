@@ -69,5 +69,49 @@ const Mobile = (() => {
     }, { passive: false });
   }
 
-  return { tap, bindHaptic, bindSwipe, disableDoubleTapZoom };
+  // Audible beep using Web Audio API — no asset, works offline.
+  // freq = 880 Hz, durationMs = total length, pulses = how many short blips.
+  let audioCtx = null;
+  function beep(freq = 880, durationMs = 250, pulses = 1) {
+    try {
+      if (!audioCtx) {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return;
+        audioCtx = new Ctx();
+      }
+      // iOS suspends AudioContext until first user gesture.
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const pulseLen = durationMs / (pulses * 2);
+      for (let i = 0; i < pulses; i++) {
+        const startAt = audioCtx.currentTime + (i * pulseLen * 2) / 1000;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.frequency.value = freq;
+        osc.type = 'sine';
+        osc.connect(gain).connect(audioCtx.destination);
+        gain.gain.setValueAtTime(0.0001, startAt);
+        gain.gain.exponentialRampToValueAtTime(0.6, startAt + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.0001, startAt + pulseLen / 1000);
+        osc.start(startAt);
+        osc.stop(startAt + pulseLen / 1000 + 0.02);
+      }
+    } catch {}
+  }
+
+  // Combined alert: vibration + beep + (optional) push notification.
+  // Used for re-boarding deadline thresholds (5/15/30/60 min).
+  function alarm(level) {
+    const profiles = {
+      info:    { vib: [60, 40, 60], freq: 880,  dur: 200, pulses: 2 },
+      warning: { vib: [120, 80, 120, 80, 120], freq: 660, dur: 350, pulses: 3 },
+      urgent:  { vib: [200, 100, 200, 100, 200, 100, 200], freq: 440, dur: 600, pulses: 4 },
+    };
+    const p = profiles[level] || profiles.info;
+    if (navigator.vibrate) {
+      try { navigator.vibrate(p.vib); } catch {}
+    }
+    beep(p.freq, p.dur, p.pulses);
+  }
+
+  return { tap, beep, alarm, bindHaptic, bindSwipe, disableDoubleTapZoom };
 })();

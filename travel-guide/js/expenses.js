@@ -2,12 +2,54 @@
 
 const Expenses = (() => {
   let state = {};   // { id: { amount, currency, category, payer, memo, date, _updatedBy } }
-  // Approximate fallback rate; user can override in settings later.
+  // Live rate fetched from frankfurter.app (free, no auth, CORS-OK).
+  // Cached in localStorage for 6h. Falls back to a reasonable hardcoded rate
+  // if the API is unreachable (e.g. cruise wifi is dead).
   const DEFAULT_RATE_EUR_TO_KRW = 1500;
+  const RATE_CACHE_KEY = 'wedplan:fxrate';
+  const RATE_TTL = 6 * 60 * 60 * 1000;
+  let rateEurToKrw = DEFAULT_RATE_EUR_TO_KRW;
+  let rateUpdatedAt = null;
+  let rateOnChange = null;
+
+  function getRate() { return rateEurToKrw; }
+
+  function loadCachedRate() {
+    try {
+      const raw = localStorage.getItem(RATE_CACHE_KEY);
+      if (!raw) return;
+      const cached = JSON.parse(raw);
+      if (cached && cached.rate) {
+        rateEurToKrw = cached.rate;
+        rateUpdatedAt = cached.at || null;
+      }
+    } catch {}
+  }
+
+  async function fetchLiveRate() {
+    if (rateUpdatedAt && Date.now() - rateUpdatedAt < RATE_TTL) return;
+    try {
+      const res = await fetch('https://api.frankfurter.app/latest?from=EUR&to=KRW', { cache: 'no-store' });
+      if (!res.ok) return;
+      const data = await res.json();
+      const rate = data && data.rates && data.rates.KRW;
+      if (rate && rate > 100) {
+        rateEurToKrw = rate;
+        rateUpdatedAt = Date.now();
+        localStorage.setItem(RATE_CACHE_KEY, JSON.stringify({ rate, at: rateUpdatedAt }));
+        if (rateOnChange) rateOnChange();
+      }
+    } catch {
+      // Offline — keep cached/fallback rate.
+    }
+  }
 
   const CATEGORIES = ['🍽️ 식비', '🚕 교통', '🛍️ 쇼핑', '🎫 입장료', '🏨 숙박', '☕ 카페', '💧 생수/간식', '기타'];
 
   function init() {
+    loadCachedRate();
+    fetchLiveRate();
+    rateOnChange = () => render();
     Sync.subscribe('expenses', (items) => {
       state = items;
       render();
@@ -22,6 +64,27 @@ const Expenses = (() => {
         <div class="section-header">
           <h3>💶 지출 기록</h3>
           <p>매 결제마다 한 줄씩. 합계와 1인당이 자동 계산됩니다.</p>
+        </div>
+
+        <!-- Live FX converter — EUR ↔ KRW -->
+        <div class="fx-card">
+          <div class="fx-header">
+            <span class="fx-title">💱 환율</span>
+            <span id="fx-rate" class="fx-rate">1 € = ${Math.round(rateEurToKrw).toLocaleString()} ₩</span>
+            <button id="fx-refresh" class="fx-refresh" title="환율 새로고침">↻</button>
+          </div>
+          <div class="fx-row">
+            <div class="fx-input">
+              <label>EUR</label>
+              <input id="fx-eur" type="number" inputmode="decimal" placeholder="0" />
+            </div>
+            <span class="fx-equals">=</span>
+            <div class="fx-input">
+              <label>KRW</label>
+              <input id="fx-krw" type="number" inputmode="decimal" placeholder="0" />
+            </div>
+          </div>
+          <div class="fx-meta" id="fx-meta"></div>
         </div>
 
         <div class="settings-card">
@@ -51,8 +114,54 @@ const Expenses = (() => {
 
       document.getElementById('exp-add').addEventListener('click', addItem);
       document.getElementById('exp-payer').value = Sync.getUser().name === '와이프' ? '와이프' : '남편';
+      bindFxConverter();
     }
     render();
+    updateFxMeta();
+  }
+
+  function bindFxConverter() {
+    const eurEl = document.getElementById('fx-eur');
+    const krwEl = document.getElementById('fx-krw');
+    const refreshBtn = document.getElementById('fx-refresh');
+    if (!eurEl || !krwEl) return;
+
+    let editing = null;
+    eurEl.addEventListener('input', () => {
+      editing = 'eur';
+      const v = Number(eurEl.value);
+      krwEl.value = v ? Math.round(v * rateEurToKrw) : '';
+    });
+    krwEl.addEventListener('input', () => {
+      editing = 'krw';
+      const v = Number(krwEl.value);
+      eurEl.value = v ? (v / rateEurToKrw).toFixed(2) : '';
+    });
+
+    refreshBtn?.addEventListener('click', async () => {
+      refreshBtn.classList.add('spin');
+      rateUpdatedAt = null;   // force refetch
+      await fetchLiveRate();
+      refreshBtn.classList.remove('spin');
+      const rateEl = document.getElementById('fx-rate');
+      if (rateEl) rateEl.textContent = `1 € = ${Math.round(rateEurToKrw).toLocaleString()} ₩`;
+      updateFxMeta();
+      // Re-fill the un-edited side so values stay consistent with the new rate
+      if (editing === 'eur') krwEl.dispatchEvent(new Event('input'));
+      if (editing === 'krw') eurEl.dispatchEvent(new Event('input'));
+    });
+  }
+
+  function updateFxMeta() {
+    const el = document.getElementById('fx-meta');
+    if (!el) return;
+    if (!rateUpdatedAt) {
+      el.textContent = '※ 기본 환율 사용 중 — ↻ 눌러 최신화';
+      return;
+    }
+    const ageMin = Math.floor((Date.now() - rateUpdatedAt) / 60000);
+    const ageStr = ageMin < 60 ? `${ageMin}분 전` : `${Math.floor(ageMin/60)}시간 전`;
+    el.textContent = `frankfurter.app · ${ageStr} 갱신`;
   }
 
   function addItem() {
@@ -87,8 +196,8 @@ const Expenses = (() => {
     let totalEUR = 0, totalKRW = 0;
     const byCategory = {};
     items.forEach((it) => {
-      const eur = it.currency === 'EUR' ? it.amount : it.amount / DEFAULT_RATE_EUR_TO_KRW;
-      const krw = it.currency === 'KRW' ? it.amount : it.amount * DEFAULT_RATE_EUR_TO_KRW;
+      const eur = it.currency === 'EUR' ? it.amount : it.amount / rateEurToKrw;
+      const krw = it.currency === 'KRW' ? it.amount : it.amount * rateEurToKrw;
       totalEUR += eur;
       totalKRW += krw;
       byCategory[it.category] = (byCategory[it.category] || 0) + eur;

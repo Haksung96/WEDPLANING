@@ -85,6 +85,7 @@
             <div class="rb-time" id="rb-countdown">--</div>
             <div class="rb-meta" id="rb-meta"></div>
           </div>
+          <button id="rb-test-alarm" class="rb-test-btn" title="알람 미리 듣기 — iOS는 한 번 들어둬야 자동 알람 작동">🔔</button>
         </div>
 
         <div id="proximity-banner" class="proximity-banner hidden">
@@ -161,6 +162,9 @@
       <!-- Phrases View -->
       <section id="view-phrases" class="view"></section>
 
+      <!-- Vault View -->
+      <section id="view-vault" class="view"></section>
+
       <!-- Settings View -->
       <section id="view-settings" class="view"></section>
     </main>
@@ -179,6 +183,7 @@
       <div class="more-sheet">
         <button class="more-item" data-view="tips"><span>⚠️</span><span>팁 & 주의사항</span></button>
         <button class="more-item" data-view="notes"><span>📝</span><span>공유 메모</span></button>
+        <button class="more-item" data-view="vault"><span>🔐</span><span>보관함 (여권·예약번호)</span></button>
         <button class="more-item" data-view="phrases"><span>🗣️</span><span>여행 회화 (스/이/프)</span></button>
         <button class="more-item" data-view="settings"><span>⚙️</span><span>설정 (API 키 등)</span></button>
         <button class="more-item" data-close-more><span>✕</span><span>닫기</span></button>
@@ -200,6 +205,7 @@
   <script src="js/sync.js"></script>
   <script src="js/checklist.js"></script>
   <script src="js/expenses.js"></script>
+  <script src="js/vault.js"></script>
   <script src="js/weather.js"></script>
   <script src="js/presence.js"></script>
   <script src="js/reboarding.js"></script>

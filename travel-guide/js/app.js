@@ -103,6 +103,7 @@ const App = (() => {
     // Initialize subsystems
     Checklist.init();
     Expenses.init();
+    if (typeof Vault !== 'undefined') Vault.init();
     MapView.init();
     setupNavigation();
     setupNotes();
@@ -118,6 +119,15 @@ const App = (() => {
       () => navigateDay(+1),   // swipe left → next day
       () => navigateDay(-1),   // swipe right → prev day
     );
+
+    // Re-boarding alarm preview — also unlocks AudioContext on iOS
+    const rbTestBtn = document.getElementById('rb-test-alarm');
+    if (rbTestBtn) {
+      rbTestBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (typeof Mobile !== 'undefined') Mobile.alarm('warning');
+      });
+    }
 
     // Re-boarding countdown — only updates when viewing today
     Reboarding.start(
@@ -204,6 +214,7 @@ const App = (() => {
     document.querySelectorAll('.view').forEach((v) => v.classList.toggle('active', v.id === `view-${view}`));
     if (view === 'map') MapView.setDayIndex(currentDayIndex);
     if (view === 'expenses') Expenses.bind();
+    if (view === 'vault' && typeof Vault !== 'undefined') Vault.bind();
     if (view === 'settings') Settings.bind();
     updateHeader(view);
   }
@@ -230,6 +241,9 @@ const App = (() => {
     } else if (view === 'phrases') {
       dayLabel.textContent = '회화';
       txt.textContent = '여행 필수 표현';
+    } else if (view === 'vault') {
+      dayLabel.textContent = '보관함';
+      txt.textContent = '여권 · 예약번호 · 핫라인';
     } else if (view === 'settings') {
       dayLabel.textContent = '설정';
       txt.textContent = 'API 키 / 공유';
@@ -633,7 +647,10 @@ const App = (() => {
     countdown.textContent = fmt(state.minsUntil);
     meta.textContent = `${state.time} · ${state.title}`;
 
-    // Notify on threshold crossings (60 / 30 / 15 min)
+    // Notify on threshold crossings (60 / 30 / 15 / 5 min) — escalating
+    // urgency: info → warning → urgent. Each fires both a push notification
+    // and a vibration+beep so the alarm is impossible to miss even with
+    // phone in pocket / Do Not Disturb on (vibration usually still works).
     const day = TRIP.days[currentDayIndex];
     const thresholds = [60, 30, 15, 5];
     thresholds.forEach((t) => {
@@ -648,7 +665,8 @@ const App = (() => {
             });
           }
           if (typeof Mobile !== 'undefined') {
-            Mobile.tap(t <= 30 ? 'error' : 'success');
+            const level = t <= 5 ? 'urgent' : t <= 15 ? 'urgent' : t <= 30 ? 'warning' : 'info';
+            Mobile.alarm(level);
           }
         }
       }
