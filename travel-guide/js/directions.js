@@ -116,6 +116,24 @@ const Directions = (() => {
       return;
     }
 
+    // Short-distance shortcut: Google's walking/transit routers refuse to
+    // return a route under ~10m. Show a friendly "you're already there"
+    // banner instead of a confusing "경로 없음" error. 30m threshold covers
+    // GPS jitter (typical accuracy 5-15m).
+    const directDist = haversineKm(origin, { lat: currentDest.lat, lng: currentDest.lng }) * 1000;
+    if (directDist < 30) {
+      cache[mode] = { closeBy: true };
+      body.innerHTML = `
+        <div class="dir-empty">
+          <p style="font-size: 22px;">✓</p>
+          <p style="font-size: 15px; color: var(--success); font-weight: 700;">이미 도착했어요</p>
+          <p class="dir-hint">목적지와 ${Math.round(directDist)}m 거리 — 바로 옆이라 길찾기는 필요 없습니다.</p>
+          ${renderExternalLinks(mode)}
+        </div>
+      `;
+      return;
+    }
+
     // Taxi mode: use DRIVING and add a fare estimate + ride-hail deep link.
     const apiMode = mode === 'TAXI' ? 'DRIVING' : mode;
 
@@ -280,20 +298,28 @@ const Directions = (() => {
     const dest = currentDest;
     const placeQuery = encodeURIComponent(dest.name || `${dest.lat},${dest.lng}`);
     const destCoords = `${dest.lat},${dest.lng}`;
-    const travelMode = mode === 'TAXI' ? 'driving'
-      : mode === 'TRANSIT' ? 'transit'
-      : mode.toLowerCase();
+    // Legacy dirflg map: w=walking, r=transit, d=driving, b=bicycling.
+    // Google Maps app universal link handler reads this reliably across
+    // iOS/Android, unlike the newer ?api=1&travelmode=... format which is
+    // frequently ignored on mobile.
+    const dirflg = mode === 'TAXI' || mode === 'DRIVING' ? 'd'
+      : mode === 'TRANSIT' ? 'r'
+      : 'w';
 
-    // Build the routing URL with both origin (live GPS, if known) and
-    // destination. Including origin avoids 'route not found' errors when
-    // Google has to guess the user's location from cached IP.
     const userPos = (typeof MapView !== 'undefined' && MapView.getLastPosition)
       ? MapView.getLastPosition() : null;
-    const originParam = userPos ? `&origin=${userPos.lat},${userPos.lng}` : '';
-    const gmap = `https://www.google.com/maps/dir/?api=1&destination=${placeQuery}${originParam}&travelmode=${travelMode}`;
-    // Plain "show on map" URL — useful when routing fails (e.g. distance
-    // too long for selected mode), user can manually pick mode in Google.
-    const gmapShow = `https://www.google.com/maps/search/?api=1&query=${placeQuery}`;
+    const saddr = userPos ? `&saddr=${userPos.lat},${userPos.lng}` : '';
+    // For destination prefer coords (always unambiguous) since Google Maps
+    // app reads them more reliably than name-based geocoding for routing.
+    // The 'show on map' fallback below uses name search instead.
+    const daddr = destCoords;
+    const gmap = `https://maps.google.com/maps?daddr=${daddr}${saddr}&dirflg=${dirflg}`;
+    // 'Show on map' fallback — opens the destination as a place pin so
+    // user can pick directions inside Google Maps if our forced mode fails.
+    const gmapShow = dest.name
+      ? `https://www.google.com/maps/search/?api=1&query=${placeQuery}`
+      : `https://maps.google.com/?q=${destCoords}`;
+
     const links = [];
     links.push(`<a class="dir-link primary" href="${gmap}" target="_blank">↗️ Google 지도에서 길찾기</a>`);
     links.push(`<a class="dir-link" href="${gmapShow}" target="_blank">📍 Google 지도에서 위치 보기</a>`);
@@ -368,6 +394,16 @@ const Directions = (() => {
       HEAVY_RAIL: '🚆', COMMUTER_TRAIN: '🚆', HIGH_SPEED_TRAIN: '🚄',
       FERRY: '⛴️', CABLE_CAR: '🚠', FUNICULAR: '🚞', GONDOLA_LIFT: '🚡',
     }[type]) || '🚌';
+  }
+
+  function haversineKm(a, b) {
+    const R = 6371;
+    const toRad = (d) => d * Math.PI / 180;
+    const dLat = toRad(b.lat - a.lat);
+    const dLng = toRad(b.lng - a.lng);
+    const sa = Math.sin(dLat/2) ** 2
+      + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng/2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(sa));
   }
 
   function stripHtml(html) {

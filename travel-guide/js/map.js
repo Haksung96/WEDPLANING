@@ -429,19 +429,22 @@ const MapView = (() => {
         const distNow = lastPosition ? haversine(lastPosition, pos) : null;
         const distNowStr = distNow == null ? '' : (distNow < 1000 ? `${Math.round(distNow)}m` : `${(distNow/1000).toFixed(1)}km`);
 
-        // Build robust Google Maps URLs:
-        // - Routing URL: include both origin (my GPS) and destination (partner GPS)
-        //   WITHOUT travelmode so Google picks the best mode (도보·대중교통·자동차)
-        //   automatically. Forcing 'walking' fails if distance is too long.
-        // - Show URL: just open the partner's pin in Google Maps so user can
-        //   manually pick the route mode in Google's own UI.
+        // For partner GPS coordinates we don't have a place name, so the
+        // legacy saddr/daddr format gives the most reliable behavior across
+        // iOS Safari, Android Chrome, and the Google Maps app universal link.
+        // (The newer dir/?api=1 format frequently drops the origin param on
+        // mobile, leaving Google with "사용자의 대략적인 위치".)
         const dest = `${pos.lat},${pos.lng}`;
-        const origin = lastPosition ? `&origin=${lastPosition.lat},${lastPosition.lng}` : '';
-        const dirUrl = `https://www.google.com/maps/dir/?api=1&destination=${dest}${origin}`;
-        const showUrl = `https://www.google.com/maps/search/?api=1&query=${dest}`;
+        const origin = lastPosition ? `${lastPosition.lat},${lastPosition.lng}` : '';
+        const showUrl = `https://maps.google.com/?q=${dest}`;
+        const dirUrl = origin
+          ? `https://maps.google.com/maps?saddr=${origin}&daddr=${dest}`
+          : `https://maps.google.com/maps?daddr=${dest}`;
+        const tooClose = distNow != null && distNow < 80;
 
-        // Internal route panel button (Directions sheet) — pass partner as a
-        // pseudo-location so user gets walk/transit/driving comparison inside the app.
+        // Internal Directions panel — the most reliable option since it
+        // stays inside the app and our own DirectionsService handles short
+        // distances gracefully (≥1m).
         const partnerLoc = JSON.stringify({ name: `💑 ${partner.name}`, lat: pos.lat, lng: pos.lng })
           .replace(/'/g, '&#39;').replace(/"/g, '&quot;');
 
@@ -449,19 +452,26 @@ const MapView = (() => {
           <div style="padding:8px; min-width:200px;">
             <strong>📍 ${escape(partner.name)}</strong><br/>
             <small>마지막 업데이트: ${escape(ageNow)}</small><br/>
-            ${distNowStr ? `<small>나와의 거리: <strong>${escape(distNowStr)}</strong></small><br/>` : ''}
+            ${distNowStr ? `<small>나와의 거리: <strong>${escape(distNowStr)}</strong></small></br>` : ''}
+            ${tooClose ? `
+              <div style="margin-top:6px; padding:6px 8px; background:#f0fdf4; color:#16a34a; border-radius:8px; font-size:12px; font-weight:700;">
+                ✓ 이미 가까이 있어요
+              </div>
+            ` : ''}
             <div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap;">
               <button data-iw-partner-route='${partnerLoc}'
                       style="background:#ff6b9d; color:white; border:none; border-radius:14px; padding:6px 12px; font-size:12px; font-weight:700; cursor:pointer;">
-                🚦 경로 보기
+                🚦 앱 안에서 경로 비교
               </button>
-              <a href="${dirUrl}" target="_blank"
-                 style="font-size:12px; color:#ff6b9d; font-weight:700; align-self:center;">
-                ↗️ Google 길찾기
-              </a>
+              ${!tooClose ? `
+                <a href="${dirUrl}" target="_blank"
+                   style="font-size:12px; color:#ff6b9d; font-weight:700; align-self:center;">
+                  ↗️ Google 길찾기
+                </a>
+              ` : ''}
               <a href="${showUrl}" target="_blank"
                  style="font-size:12px; color:#666; font-weight:600; align-self:center;">
-                📍 위치만 보기
+                📍 위치 핀
               </a>
             </div>
           </div>
