@@ -2,14 +2,19 @@
 
 const Expenses = (() => {
   let state = {};   // { id: { amount, currency, category, payer, memo, date, _updatedBy } }
-  // Live rate fetched from frankfurter.app (free, no auth, CORS-OK).
-  // Cached in localStorage for 6h. Falls back to a reasonable hardcoded rate
-  // if the API is unreachable (e.g. cruise wifi is dead).
+  // Live rate — primary source is the Korean 매매기준율 (interbank reference
+  // rate) via Dunamu/Upbit's public forex feed, which Korean fintech apps
+  // (Toss, KakaoBank, etc.) use. Falls back to ECB rate (frankfurter.app)
+  // if Dunamu is unreachable, then to a hardcoded ~1500 ₩/€ if both fail.
+  // Cached in localStorage for 6h.
   const DEFAULT_RATE_EUR_TO_KRW = 1500;
   const RATE_CACHE_KEY = 'wedplan:fxrate';
   const RATE_TTL = 6 * 60 * 60 * 1000;
   let rateEurToKrw = DEFAULT_RATE_EUR_TO_KRW;
   let rateUpdatedAt = null;
+  let rateSource = '기본 환율';
+  let rateChange = null;        // 'RISE' | 'FALL' | 'EVEN' | null
+  let rateChangePrice = null;   // delta vs previous close
   let rateOnChange = null;
 
   function getRate() { return rateEurToKrw; }
@@ -22,12 +27,41 @@ const Expenses = (() => {
       if (cached && cached.rate) {
         rateEurToKrw = cached.rate;
         rateUpdatedAt = cached.at || null;
+        rateSource = cached.source || '캐시된 환율';
+        rateChange = cached.change || null;
+        rateChangePrice = cached.changePrice || null;
       }
     } catch {}
   }
 
   async function fetchLiveRate() {
     if (rateUpdatedAt && Date.now() - rateUpdatedAt < RATE_TTL) return;
+
+    // Primary: Dunamu (매매기준율 — Korean interbank reference)
+    try {
+      const res = await fetch(
+        'https://quotation-api-cdn.dunamu.com/v1/forex/recent?codes=FRX.KRWEUR',
+        { cache: 'no-store' }
+      );
+      if (res.ok) {
+        const arr = await res.json();
+        const item = Array.isArray(arr) && arr[0];
+        const basePrice = item && Number(item.basePrice);
+        if (basePrice && basePrice > 100) {
+          rateEurToKrw = basePrice;
+          rateUpdatedAt = Date.now();
+          rateSource = '매매기준율';
+          rateChange = item.change || null;
+          rateChangePrice = item.changePrice ? Number(item.changePrice) : null;
+          saveCachedRate();
+          if (rateOnChange) rateOnChange();
+          return;
+        }
+      }
+    } catch { /* fall through to ECB fallback */ }
+
+    // Fallback: ECB reference rate (frankfurter.app). Slightly different
+    // from Korean 매매기준율 but close enough for trip-budget display.
     try {
       const res = await fetch('https://api.frankfurter.app/latest?from=EUR&to=KRW', { cache: 'no-store' });
       if (!res.ok) return;
@@ -36,12 +70,25 @@ const Expenses = (() => {
       if (rate && rate > 100) {
         rateEurToKrw = rate;
         rateUpdatedAt = Date.now();
-        localStorage.setItem(RATE_CACHE_KEY, JSON.stringify({ rate, at: rateUpdatedAt }));
+        rateSource = 'ECB 참고 환율';
+        rateChange = null;
+        rateChangePrice = null;
+        saveCachedRate();
         if (rateOnChange) rateOnChange();
       }
     } catch {
       // Offline — keep cached/fallback rate.
     }
+  }
+
+  function saveCachedRate() {
+    localStorage.setItem(RATE_CACHE_KEY, JSON.stringify({
+      rate: rateEurToKrw,
+      at: rateUpdatedAt,
+      source: rateSource,
+      change: rateChange,
+      changePrice: rateChangePrice,
+    }));
   }
 
   const CATEGORIES = ['🍽️ 식비', '🚕 교통', '🛍️ 쇼핑', '🎫 입장료', '🏨 숙박', '☕ 카페', '💧 생수/간식', '기타'];
@@ -66,11 +113,11 @@ const Expenses = (() => {
           <p>매 결제마다 한 줄씩. 합계와 1인당이 자동 계산됩니다.</p>
         </div>
 
-        <!-- Live FX converter — EUR ↔ KRW -->
+        <!-- Live FX converter — EUR ↔ KRW (매매기준율) -->
         <div class="fx-card">
           <div class="fx-header">
             <span class="fx-title">💱 환율</span>
-            <span id="fx-rate" class="fx-rate">1 € = ${Math.round(rateEurToKrw).toLocaleString()} ₩</span>
+            <span id="fx-rate" class="fx-rate"></span>
             <button id="fx-refresh" class="fx-refresh" title="환율 새로고침">↻</button>
           </div>
           <div class="fx-row">
@@ -143,13 +190,26 @@ const Expenses = (() => {
       rateUpdatedAt = null;   // force refetch
       await fetchLiveRate();
       refreshBtn.classList.remove('spin');
-      const rateEl = document.getElementById('fx-rate');
-      if (rateEl) rateEl.textContent = `1 € = ${Math.round(rateEurToKrw).toLocaleString()} ₩`;
+      updateFxRateLabel();
       updateFxMeta();
-      // Re-fill the un-edited side so values stay consistent with the new rate
       if (editing === 'eur') krwEl.dispatchEvent(new Event('input'));
       if (editing === 'krw') eurEl.dispatchEvent(new Event('input'));
     });
+
+    updateFxRateLabel();
+    updateFxMeta();
+  }
+
+  function updateFxRateLabel() {
+    const rateEl = document.getElementById('fx-rate');
+    if (!rateEl) return;
+    let arrow = '';
+    if (rateChange === 'RISE') {
+      arrow = `<span class="fx-up">▲ ${rateChangePrice ? rateChangePrice.toFixed(2) : ''}</span>`;
+    } else if (rateChange === 'FALL') {
+      arrow = `<span class="fx-down">▼ ${rateChangePrice ? rateChangePrice.toFixed(2) : ''}</span>`;
+    }
+    rateEl.innerHTML = `1 € = ${Math.round(rateEurToKrw).toLocaleString()} ₩ ${arrow}`;
   }
 
   function updateFxMeta() {
@@ -160,8 +220,8 @@ const Expenses = (() => {
       return;
     }
     const ageMin = Math.floor((Date.now() - rateUpdatedAt) / 60000);
-    const ageStr = ageMin < 60 ? `${ageMin}분 전` : `${Math.floor(ageMin/60)}시간 전`;
-    el.textContent = `frankfurter.app · ${ageStr} 갱신`;
+    const ageStr = ageMin < 1 ? '방금' : (ageMin < 60 ? `${ageMin}분 전` : `${Math.floor(ageMin/60)}시간 전`);
+    el.textContent = `${rateSource} · ${ageStr} 갱신`;
   }
 
   function addItem() {
