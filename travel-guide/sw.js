@@ -1,6 +1,6 @@
 // Service Worker — offline cache for app shell
 
-const CACHE_NAME = 'wedplan-v13';
+const CACHE_NAME = 'wedplan-v14';
 const APP_SHELL = [
   './',
   './index.html',

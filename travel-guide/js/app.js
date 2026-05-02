@@ -12,6 +12,18 @@ const App = (() => {
     showIosInstallHintIfNeeded();
   }
 
+  // Local-date string in YYYY-MM-DD form. Critical: data.js stores dates
+  // in the city's local time (CET/CEST in Europe), so 'today' must use the
+  // phone's local timezone, NOT UTC. toISOString() returns UTC, which flips
+  // a day at midnight Europe time and 09:00 Korea time → wrong "today".
+  function localDateStr(d) {
+    d = d || new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
   function showIosInstallHintIfNeeded() {
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
     const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
@@ -110,9 +122,9 @@ const App = (() => {
     // Re-boarding countdown — only updates when viewing today
     Reboarding.start(
       () => {
-        const todayStr = new Date().toISOString().slice(0, 10);
+        const todayStr = localDateStr();
         const day = TRIP.days[currentDayIndex];
-        return day && day.date === todayStr ? day : null;
+        return day && effectiveDate(day) === todayStr ? day : null;
       },
       renderReboardingBanner
     );
@@ -234,7 +246,7 @@ const App = (() => {
 
   function getDefaultDayIndex() {
     const today = new Date();
-    const todayStr = today.toISOString().slice(0, 10);
+    const todayStr = localDateStr(today);
     // Match by EFFECTIVE date so the "today" jump respects swaps.
     const idx = TRIP.days.findIndex((d) => effectiveDate(d) === todayStr);
     if (idx >= 0) return idx;
@@ -245,7 +257,7 @@ const App = (() => {
   function renderDayPills() {
     const root = document.getElementById('day-selector');
     root.innerHTML = '';
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayStr = localDateStr();
     const todayIdx = TRIP.days.findIndex((d) => effectiveDate(d) === todayStr);
 
     // Sort indices by effective date so swapped pairs appear in chronological
@@ -344,7 +356,7 @@ const App = (() => {
       ? EventEditor.applyOverrides(day, day.events)
       : day.events;
 
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayStr = localDateStr();
     const dayDate = effectiveDate(day);
     const isToday = dayDate === todayStr;
     const isSwapped = typeof EventEditor !== 'undefined' && EventEditor.isDaySwapped(day.date);
@@ -531,12 +543,34 @@ const App = (() => {
   let clockTimer = null;
   function startClock() {
     if (clockTimer) clearInterval(clockTimer);
+    updateDualClock();
     clockTimer = setInterval(() => {
+      updateDualClock();
       const today = TRIP.days[currentDayIndex];
       if (!today) return;
-      const todayStr = new Date().toISOString().slice(0, 10);
-      if (today.date === todayStr) renderTodayView();
+      const todayStr = localDateStr();
+      if (effectiveDate(today) === todayStr) renderTodayView();
     }, 60000);   // every minute
+  }
+
+  // Dual clock — local phone time + Seoul time. Useful for video-calling
+  // family in Korea (8h difference May, after Korean DST? Korea has no DST,
+  // so it's KST=UTC+9 always. Spain CEST=UTC+2 May → 7h diff. Italy/France
+  // same. Tunisia CET=UTC+1 → 8h diff.) Computed in real time so it's
+  // always accurate regardless of where the phone is.
+  function updateDualClock() {
+    const el = document.getElementById('dual-clock');
+    if (!el) return;
+    const now = new Date();
+    const local = now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
+    const seoul = now.toLocaleTimeString('ko-KR', {
+      hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Seoul',
+    });
+    if (local === seoul) {
+      el.innerHTML = `<small>🇰🇷</small> ${local}`;
+    } else {
+      el.innerHTML = `${local} <small>· 🇰🇷 ${seoul}</small>`;
+    }
   }
 
   function toggleEventDone(key) {
@@ -691,7 +725,7 @@ const App = (() => {
     `;
 
     if (day.cityCenter) {
-      Weather.getDayForecast(day.date, day.cityCenter.lat, day.cityCenter.lng).then((w) => {
+      Weather.getDayForecast(effectiveDate(day), day.cityCenter.lat, day.cityCenter.lng).then((w) => {
         const el = document.getElementById('qg-weather');
         if (!el) return;
         if (!w) {

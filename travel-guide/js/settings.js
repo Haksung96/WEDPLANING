@@ -87,6 +87,15 @@ const Settings = (() => {
       </div>
 
       <div class="settings-card">
+        <h4>🔋 배터리 세이버 모드</h4>
+        <p class="setting-hint">위치 추적의 정밀도를 낮추고 갱신 주기를 늘려 배터리를 아낍니다 (정확도 ±50m). 여행 중 보조배터리 없이 오래 사용할 때 권장.</p>
+        <label class="toggle-row">
+          <input type="checkbox" id="set-battery-saver" ${cur.batterySaver ? 'checked' : ''} />
+          <span>저전력 위치 추적 사용</span>
+        </label>
+      </div>
+
+      <div class="settings-card">
         <h4>🔍 Firebase 동기화 진단</h4>
         <p class="setting-hint">실시간 동기화가 안 될 때 여기서 점검:</p>
         <div id="sync-diag-summary" class="sync-diag-summary"></div>
@@ -193,6 +202,7 @@ const Settings = (() => {
           appId: val('set-fb-appId'),
         },
         proximityRadius: Number(document.getElementById('set-radius').value) || 250,
+        batterySaver: document.getElementById('set-battery-saver').checked,
       };
       save(values);
       alert('저장됨. 페이지를 새로고침합니다.');

@@ -327,6 +327,19 @@ const MapView = (() => {
       );
     }
 
+    // Battery saver mode: when ON (default OFF), use lower-accuracy GPS
+    // and a longer cache window. Saves significant battery on multi-day
+    // trips at the cost of ~50m position drift.
+    const saver = (function() {
+      try {
+        const raw = localStorage.getItem('wedplan:settings');
+        return raw && JSON.parse(raw).batterySaver;
+      } catch { return false; }
+    })();
+    const watchOpts = saver
+      ? { enableHighAccuracy: false, maximumAge: 60000, timeout: 30000 }
+      : { enableHighAccuracy: true, maximumAge: 10000, timeout: 30000 };
+
     watchId = navigator.geolocation.watchPosition(
       (pos) => {
         lastPosition = {
@@ -336,7 +349,8 @@ const MapView = (() => {
         };
         if (map) updateUserMarker();
         checkProximity();
-        setStatus(`📍 현재 위치 추적 중 (정확도 ${Math.round(pos.coords.accuracy)}m)`);
+        const acc = Math.round(pos.coords.accuracy);
+        setStatus(`📍 현재 위치 추적 중 (정확도 ${acc}m${saver ? ' · 배터리 절약' : ''})`);
       },
       (err) => {
         const msg = err.code === 1
@@ -344,7 +358,7 @@ const MapView = (() => {
           : '위치를 가져올 수 없습니다.';
         setStatus(`⚠️ ${msg}`);
       },
-      { enableHighAccuracy: true, maximumAge: 10000, timeout: 30000 }
+      watchOpts
     );
   }
 

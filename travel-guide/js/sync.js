@@ -54,8 +54,12 @@ const Sync = (() => {
 
         window.addEventListener('online', () => {
           if (mode === 'firebase' && diag.lastError == null) setStatus('online');
+          showConnToast('🟢 인터넷 복구 — 자동 동기화 중', 'online');
         });
-        window.addEventListener('offline', () => setStatus('offline'));
+        window.addEventListener('offline', () => {
+          setStatus('offline');
+          showConnToast('🟡 오프라인 — 입력은 자동 저장, 재접속 시 동기화', 'offline');
+        });
       } catch (err) {
         console.warn('Firebase init failed, falling back to local:', err);
         diag.initStatus = 'error';
@@ -88,6 +92,21 @@ const Sync = (() => {
 
   function getDiagnostics() {
     return { ...diag, mode, tripCode: user.tripCode, name: user.name };
+  }
+
+  let toastTimer = null;
+  function showConnToast(msg, kind) {
+    let el = document.getElementById('conn-toast');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'conn-toast';
+      el.className = 'conn-toast';
+      document.body.appendChild(el);
+    }
+    el.textContent = msg;
+    el.className = `conn-toast show ${kind || ''}`;
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 4000);
   }
 
   // -------- Subscribe --------

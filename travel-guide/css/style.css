@@ -251,6 +251,72 @@ input, textarea, select {
 }
 .trip-code-tag:active { background: var(--border); }
 
+.dual-clock {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  height: 28px;
+  border-radius: 14px;
+  background: var(--bg-elev);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, 'SF Mono', monospace;
+  margin-right: 4px;
+  white-space: nowrap;
+}
+.dual-clock small {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+.toggle-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+}
+
+.conn-toast {
+  position: fixed;
+  bottom: calc(80px + var(--safe-bottom));
+  left: 50%;
+  transform: translate(-50%, 20px);
+  background: var(--bg-card);
+  color: var(--text);
+  padding: 12px 18px;
+  border-radius: 24px;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border);
+  z-index: 250;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s, transform 0.25s;
+  white-space: nowrap;
+  max-width: calc(100vw - 32px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.conn-toast.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+.conn-toast.online { border-color: rgba(74, 222, 128, 0.5); }
+.conn-toast.offline { border-color: rgba(251, 191, 36, 0.5); }
+
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
