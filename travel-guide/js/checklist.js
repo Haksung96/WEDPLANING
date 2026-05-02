@@ -1,13 +1,28 @@
 // Packing checklist with real-time sync.
+//
+// HISTORY: Originally each device generated random per-item IDs (text +
+// Date.now() + Math.random()), so when both phones logged in for the first
+// time they each ran seedDefaults independently and produced two full
+// duplicate sets in Firestore. Fixed by:
+//   1) Using DETERMINISTIC IDs for default items — both devices write to the
+//      same document IDs, so Firestore merges instead of duplicating.
+//   2) One-shot dedupe on first load to clean up data created before the fix.
 
 const Checklist = (() => {
-  let state = {};   // { itemId: { text, category, checked, _updatedBy, _updatedAt } }
+  let state = {};
   let collapsed = new Set();
+  let firstSnapshotProcessed = false;
 
   function init() {
-    seedDefaultsIfEmpty();
     Sync.subscribe('checklist', (items) => {
       state = items;
+      // Run dedup ONCE per app session, after the first remote snapshot
+      // arrives. Subsequent snapshots only trigger render.
+      if (!firstSnapshotProcessed) {
+        firstSnapshotProcessed = true;
+        deduplicateOnce();
+        seedDefaultsIfEmpty();
+      }
       render();
     });
     populateCategorySelect();
@@ -17,14 +32,44 @@ const Checklist = (() => {
     });
   }
 
-  function seedDefaultsIfEmpty() {
-    // Seed only on first run (when nothing in storage and we're in local mode).
-    const seedKey = `wedplan:${Sync.getUser().tripCode}:checklist:seeded`;
-    if (localStorage.getItem(seedKey)) return;
+  // Drop duplicates that share (category, text). Keeps the oldest item
+  // (by _updatedAt) and deletes the rest. Fire-and-forget; the snapshot
+  // listener will pick up the deletes and re-render.
+  function deduplicateOnce() {
+    const groups = new Map();
+    Object.entries(state).forEach(([id, item]) => {
+      if (!item || !item.text) return;
+      const key = `${item.category || ''}::${item.text.trim()}`;
+      const arr = groups.get(key) || [];
+      arr.push({ id, item });
+      groups.set(key, arr);
+    });
+    let removed = 0;
+    groups.forEach((arr) => {
+      if (arr.length < 2) return;
+      // Sort oldest first (smaller _updatedAt wins). Items with no timestamp
+      // sort last so they get deleted first.
+      arr.sort((a, b) => (a.item._updatedAt || Infinity) - (b.item._updatedAt || Infinity));
+      const [keep, ...dups] = arr;
+      // Merge any 'checked: true' from duplicates into the keeper so we don't
+      // lose a check-off if the duplicate was the one that got toggled.
+      const anyChecked = arr.some((x) => x.item.checked);
+      if (anyChecked && !keep.item.checked) {
+        Sync.setItem('checklist', keep.id, { ...keep.item, checked: true });
+      }
+      dups.forEach(({ id }) => {
+        Sync.deleteItem('checklist', id);
+        removed++;
+      });
+    });
+    if (removed > 0) console.info(`[checklist] removed ${removed} duplicate items`);
+  }
 
+  function seedDefaultsIfEmpty() {
+    if (Object.keys(state).length > 0) return;   // already populated
     DEFAULT_CHECKLIST.forEach((cat) => {
-      cat.items.forEach((text, i) => {
-        const id = `${slug(cat.category)}-${i}-${Date.now()}-${Math.random().toString(36).slice(2,7)}`;
+      cat.items.forEach((text) => {
+        const id = defaultId(cat.category, text);
         Sync.setItem('checklist', id, {
           text,
           category: cat.category,
@@ -32,7 +77,12 @@ const Checklist = (() => {
         });
       });
     });
-    localStorage.setItem(seedKey, '1');
+  }
+
+  // Deterministic ID for default items so concurrent seeds from two phones
+  // collide on the same docs (and merge) rather than producing duplicates.
+  function defaultId(category, text) {
+    return `default-${slug(category)}-${slug(text)}`;
   }
 
   function populateCategorySelect() {
@@ -162,7 +212,14 @@ const Checklist = (() => {
   }
 
   function slug(s) {
-    return s.replace(/\s+/g, '-').toLowerCase();
+    // Keep Korean letters, digits, latin chars; replace anything else with '-'.
+    // Firestore doc IDs allow Unicode but cannot contain '/'.
+    return String(s)
+      .replace(/[\/]/g, '-')
+      .replace(/\s+/g, '-')
+      .replace(/[()[\]{}.,;:!?"'`]/g, '')
+      .toLowerCase()
+      .slice(0, 80);
   }
   function escape(s) {
     return String(s).replace(/[&<>"']/g, (c) => ({
