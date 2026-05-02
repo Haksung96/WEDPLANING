@@ -1,6 +1,6 @@
 // Service Worker — offline cache for app shell
 
-const CACHE_NAME = 'wedplan-v19';
+const CACHE_NAME = 'wedplan-v20';
 const APP_SHELL = [
   './',
   './index.html',
@@ -22,6 +22,7 @@ const APP_SHELL = [
   './js/map.js',
   './js/directions.js',
   './js/event-editor.js',
+  './js/static-views.js',
   './js/mobile.js',
   './js/app.js',
   './icons/icon-192.png',

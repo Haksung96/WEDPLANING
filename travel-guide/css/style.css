@@ -1,4 +1,33 @@
-/* Honeymoon Travel Guide — mobile-first PWA */
+/* Honeymoon Travel Guide — mobile-first PWA
+ *
+ * Single-file CSS, ~2000 lines. Sections are clearly marked with
+ * /* ========== NAME ========== */ banners; use the index below to jump.
+ *
+ * Index:
+ *   BASE          1   reset, vars, typography, animations, common buttons
+ *   LOGIN         107
+ *   APP           188 header, sync badge, dual clock, trip code tag
+ *   FX CONVERTER  320
+ *   VAULT         389 (incl. modal sheet)
+ *   REBOARDING    645
+ *   TODAY VIEW    727 day pills, event cards
+ *   MAP VIEW      970 map, status badge, partner status
+ *   CHECKLIST    1076
+ *   TIPS         1206
+ *   NOTES        1255
+ *   BOTTOM NAV   1276
+ *   MAP MARKER   1324
+ *   INSTALL UI   1329 PWA install hint
+ *   ONBOARDING   1436
+ *   QUICK GLANCE 1467
+ *   ACTIVE/NEXT  1510 event card highlights
+ *   MORE MENU    1582
+ *   SETTINGS     1624
+ *   EXPENSES     1669
+ *   PHRASES      1763
+ *   DIRECTIONS   1788 directions sheet
+ *   EDITOR       1999 event editor sheet
+ */
 
 * {
   box-sizing: border-box;

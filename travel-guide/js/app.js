@@ -103,9 +103,9 @@ const App = (() => {
     MapView.init();
     setupNavigation();
     setupNotes();
-    renderTips();
-    renderEmergency();
-    renderPhrases();
+    StaticViews.renderTips();
+    StaticViews.renderEmergency();
+    StaticViews.renderPhrases();
     renderDayPills();
     startClock();
     showOnboardingIfNeeded();
@@ -528,16 +528,54 @@ const App = (() => {
   }
 
   let clockTimer = null;
+  // Tracks the last-rendered "active/next" event index pair to avoid
+  // rebuilding the entire today list every minute when nothing meaningful
+  // changed. Only the live countdown text needs updating in that case.
+  let lastTickKey = '';
+
   function startClock() {
     if (clockTimer) clearInterval(clockTimer);
     updateDualClock();
-    clockTimer = setInterval(() => {
-      updateDualClock();
-      const today = TRIP.days[currentDayIndex];
-      if (!today) return;
-      const todayStr = localDateStr();
-      if (effectiveDate(today) === todayStr) renderTodayView();
-    }, 60000);   // every minute
+    clockTimer = setInterval(tickRender, 60000);   // every minute
+  }
+
+  function tickRender() {
+    updateDualClock();
+    const today = TRIP.days[currentDayIndex];
+    if (!today) return;
+    if (effectiveDate(today) !== localDateStr()) return;
+
+    // Compute current active/next event indices
+    const events = (typeof EventEditor !== 'undefined')
+      ? EventEditor.applyOverrides(today, today.events)
+      : today.events;
+    const nowMin = nowMinutes();
+    let activeIdx = -1, nextIdx = -1;
+    events.forEach((evt, i) => {
+      const m = parseTimeToMin(evt.time);
+      if (m == null) return;
+      if (m <= nowMin) activeIdx = i;
+      if (m > nowMin && nextIdx === -1) nextIdx = i;
+    });
+
+    const tickKey = `${activeIdx}-${nextIdx}`;
+    if (tickKey === lastTickKey) {
+      // Active/next unchanged — only the countdown text moves. Update in
+      // place to avoid DOM churn (cheap; preserves user scroll position).
+      updateCountdownInPlace(events, nextIdx, nowMin);
+      return;
+    }
+    lastTickKey = tickKey;
+    renderTodayView();
+  }
+
+  function updateCountdownInPlace(events, nextIdx, nowMin) {
+    const banner = document.querySelector('.next-up');
+    if (!banner) return;
+    if (nextIdx < 0) { banner.remove(); return; }
+    const evt = events[nextIdx];
+    const mins = parseTimeToMin(evt.time) - nowMin;
+    banner.innerHTML = `⏭️ 다음: <strong>${esc(evt.time)} ${esc(evt.title)}</strong> · ${formatCountdown(mins)} 후`;
   }
 
   // Dual clock — local phone time + Seoul time. Useful for video-calling
@@ -577,21 +615,6 @@ const App = (() => {
       : `${location.lat},${location.lng}`;
     const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
     window.open(url, '_blank');
-  }
-
-  // -------- TIPS VIEW --------
-  function renderTips() {
-    const root = document.getElementById('tips-content');
-    root.innerHTML = '';
-    TRAVEL_TIPS.forEach((cat) => {
-      const div = document.createElement('div');
-      div.className = 'tip-category';
-      div.innerHTML = `
-        <h4>${cat.icon} ${esc(cat.category)}</h4>
-        <ul>${cat.items.map((it) => `<li>${esc(it)}</li>`).join('')}</ul>
-      `;
-      root.appendChild(div);
-    });
   }
 
   let lastReboardingNotifiedKey = null;
@@ -733,51 +756,6 @@ const App = (() => {
         `;
       });
     }
-  }
-
-  function renderPhrases() {
-    const root = document.getElementById('view-phrases');
-    if (!root) return;
-    let html = `
-      <div class="section-header">
-        <h3>🗣️ 여행 회화</h3>
-        <p>한국어 → 🇪🇸 스페인어 / 🇮🇹 이탈리아어 / 🇫🇷 프랑스어</p>
-      </div>
-    `;
-    PHRASES.forEach((cat) => {
-      html += `<div class="phrase-cat"><h4>${esc(cat.category)}</h4>`;
-      cat.items.forEach((p) => {
-        html += `
-          <div class="phrase-row">
-            <div class="phrase-ko">${esc(p.ko)}</div>
-            <div class="phrase-tr"><span class="flag">🇪🇸</span> ${esc(p.es)}</div>
-            <div class="phrase-tr"><span class="flag">🇮🇹</span> ${esc(p.it)}</div>
-            <div class="phrase-tr"><span class="flag">🇫🇷</span> ${esc(p.fr)}</div>
-          </div>
-        `;
-      });
-      html += '</div>';
-    });
-    root.innerHTML = html;
-  }
-
-  function renderEmergency() {
-    const root = document.getElementById('emergency-list');
-    const labels = {
-      korea_embassy_spain: '🇪🇸 주스페인 한국대사관',
-      korea_embassy_italy: '🇮🇹 주이탈리아 한국대사관',
-      korea_embassy_france: '🇫🇷 주프랑스 한국대사관',
-      eu_emergency: '🚨 EU 긴급 (경찰/응급)',
-      travel_insurance: '🏥 여행자보험',
-    };
-    root.innerHTML = '';
-    Object.entries(TRIP.emergency).forEach(([k, v]) => {
-      const div = document.createElement('div');
-      div.className = 'em-item';
-      const tel = v.replace(/[^\d+]/g, '');
-      div.innerHTML = `<span>${labels[k] || k}</span><a href="tel:${tel}">${esc(v)}</a>`;
-      root.appendChild(div);
-    });
   }
 
   // -------- NOTES VIEW --------
