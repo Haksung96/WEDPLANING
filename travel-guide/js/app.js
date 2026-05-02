@@ -12,17 +12,13 @@ const App = (() => {
     showIosInstallHintIfNeeded();
   }
 
-  // Local-date string in YYYY-MM-DD form. Critical: data.js stores dates
-  // in the city's local time (CET/CEST in Europe), so 'today' must use the
-  // phone's local timezone, NOT UTC. toISOString() returns UTC, which flips
-  // a day at midnight Europe time and 09:00 Korea time → wrong "today".
-  function localDateStr(d) {
-    d = d || new Date();
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
-  }
+  // Local aliases for high-frequency Utils helpers
+  const localDateStr = Utils.localDateStr;
+  const weekdayOf = Utils.weekdayOf;
+  const parseTimeToMin = Utils.parseTimeToMin;
+  const formatCountdown = Utils.formatCountdown;
+  const tagColor = Utils.tagColor;
+  const esc = Utils.escape;
 
   function showIosInstallHintIfNeeded() {
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
@@ -309,12 +305,6 @@ const App = (() => {
     }
   }
 
-  const WEEKDAYS_KO = ['일', '월', '화', '수', '목', '금', '토'];
-  function weekdayOf(dateStr) {
-    const d = new Date(dateStr + 'T12:00:00');
-    return WEEKDAYS_KO[d.getDay()];
-  }
-
   function promptSwapDay(currentDayObj) {
     const myEff = effectiveDate(currentDayObj);
     const choices = TRIP.days.filter((d) => d.date !== currentDayObj.date);
@@ -535,23 +525,6 @@ const App = (() => {
   function nowMinutes() {
     const d = new Date();
     return d.getHours() * 60 + d.getMinutes();
-  }
-
-  function parseTimeToMin(timeStr) {
-    if (!timeStr) return null;
-    // "20:30" or "08:30" or "13:00 ~ 14:00" — first time wins
-    const m = String(timeStr).match(/^(\d{1,2}):(\d{2})/);
-    if (!m) return null;
-    return Number(m[1]) * 60 + Number(m[2]);
-  }
-
-  function formatCountdown(mins) {
-    if (mins < 0) return '지남';
-    const h = Math.floor(mins / 60);
-    const m = mins % 60;
-    if (h === 0) return `${m}분`;
-    if (m === 0) return `${h}시간`;
-    return `${h}시간 ${m}분`;
   }
 
   let clockTimer = null;
@@ -885,29 +858,10 @@ const App = (() => {
     document.body.appendChild(chip);
   }
 
-  function formatTime(ts) {
-    if (!ts) return '';
-    const d = new Date(ts);
-    return d.toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-  }
-
-  function esc(s) {
-    return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-    }[c]));
-  }
+  const formatTime = Utils.formatTime;
 
   function getCurrentDayIndex() {
     return currentDayIndex;
-  }
-
-  // Same palette as map.js so number badges & map markers stay color-aligned
-  function tagColor(tag) {
-    return ({
-      food: '#fb7185', walk: '#60a5fa', shop: '#c084fc',
-      attraction: '#fbbf24', hotel: '#4ade80', cruise: '#06b6d4',
-      transport: '#94a3b8', flight: '#f43f5e', rest: '#a78bfa',
-    }[tag] || '#ff6b9d');
   }
 
   return { start, getCurrentDayIndex };

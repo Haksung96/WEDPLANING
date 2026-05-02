@@ -72,24 +72,8 @@ const Presence = (() => {
     return Date.now() - data._updatedAt > STALE_AFTER;
   }
 
-  function formatAge(updatedAt) {
-    if (!updatedAt) return '';
-    const ageSec = Math.floor((Date.now() - updatedAt) / 1000);
-    if (ageSec < 60) return `${ageSec}초 전`;
-    const ageMin = Math.floor(ageSec / 60);
-    if (ageMin < 60) return `${ageMin}분 전`;
-    const ageHr = Math.floor(ageMin / 60);
-    return `${ageHr}시간 ${ageMin % 60}분 전`;
-  }
-
-  function haversine(a, b) {
-    const R = 6371000;
-    const toRad = (d) => d * Math.PI / 180;
-    const dLat = toRad(b.lat - a.lat);
-    const dLng = toRad(b.lng - a.lng);
-    const sa = Math.sin(dLat/2)**2 + Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.sin(dLng/2)**2;
-    return 2 * R * Math.asin(Math.sqrt(sa));
-  }
+  const formatAge = Utils.formatAge;
+  const haversine = Utils.haversine;
 
   return { start, stop, publish, getPartner, isStale, formatAge };
 })();

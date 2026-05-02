@@ -211,21 +211,8 @@ const Checklist = (() => {
     });
   }
 
-  function slug(s) {
-    // Keep Korean letters, digits, latin chars; replace anything else with '-'.
-    // Firestore doc IDs allow Unicode but cannot contain '/'.
-    return String(s)
-      .replace(/[\/]/g, '-')
-      .replace(/\s+/g, '-')
-      .replace(/[()[\]{}.,;:!?"'`]/g, '')
-      .toLowerCase()
-      .slice(0, 80);
-  }
-  function escape(s) {
-    return String(s).replace(/[&<>"']/g, (c) => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-    }[c]));
-  }
+  const slug = Utils.slug;
+  const escape = Utils.escape;
 
   return { init };
 })();

@@ -584,29 +584,10 @@ const MapView = (() => {
     document.getElementById('proximity-banner').classList.add('hidden');
   }
 
-  // Haversine distance in meters
-  function haversine(a, b) {
-    const R = 6371000;
-    const dLat = toRad(b.lat - a.lat);
-    const dLng = toRad(b.lng - a.lng);
-    const sa = Math.sin(dLat/2)**2 + Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.sin(dLng/2)**2;
-    return 2 * R * Math.asin(Math.sqrt(sa));
-  }
-  function toRad(d) { return d * Math.PI / 180; }
-
-  function tagColor(tag) {
-    return ({
-      food: '#fb7185', walk: '#60a5fa', shop: '#c084fc',
-      attraction: '#fbbf24', hotel: '#4ade80', cruise: '#06b6d4',
-      transport: '#94a3b8', flight: '#f43f5e', rest: '#a78bfa',
-    }[tag] || '#ff6b9d');
-  }
-
-  function escape(s) {
-    return String(s).replace(/[&<>"']/g, (c) => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-    }[c]));
-  }
+  // Local aliases for hot-path helpers — avoid lookup overhead in tight loops
+  const haversine = Utils.haversine;
+  const tagColor = Utils.tagColor;
+  const escape = Utils.escape;
 
   function getDarkMapStyle() {
     if (!window.matchMedia || !window.matchMedia('(prefers-color-scheme: dark)').matches) return null;

@@ -95,12 +95,7 @@ const EventEditor = (() => {
     return result;
   }
 
-  function parseTime(t) {
-    if (!t) return null;
-    const m = String(t).match(/^(\d{1,2}):(\d{2})/);
-    if (!m) return null;
-    return Number(m[1]) * 60 + Number(m[2]);
-  }
+  const parseTime = Utils.parseTimeToMin;
 
   // ---- Day-swap API ----
   // Swap the dates of two days. Both swap entries are written symmetrically
@@ -447,17 +442,8 @@ const EventEditor = (() => {
     close();
   }
 
-  function formatTime(ts) {
-    if (!ts) return '';
-    const d = new Date(ts);
-    return d.toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-  }
-
-  function esc(s) {
-    return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-    }[c]));
-  }
+  const formatTime = Utils.formatTime;
+  const esc = Utils.escape;
 
   return {
     init, open, close, applyOverrides, getOverrides,

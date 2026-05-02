@@ -277,11 +277,7 @@ const Settings = (() => {
     return (document.getElementById(id)?.value || '').trim();
   }
 
-  function esc(s) {
-    return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-    }[c]));
-  }
+  const esc = Utils.escape;
 
   return { loadAndApply, bind };
 })();

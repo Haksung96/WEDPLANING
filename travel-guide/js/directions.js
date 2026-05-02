@@ -120,7 +120,7 @@ const Directions = (() => {
     // return a route under ~10m. Show a friendly "you're already there"
     // banner instead of a confusing "경로 없음" error. 30m threshold covers
     // GPS jitter (typical accuracy 5-15m).
-    const directDist = haversineKm(origin, { lat: currentDest.lat, lng: currentDest.lng }) * 1000;
+    const directDist = Utils.haversine(origin, { lat: currentDest.lat, lng: currentDest.lng });
     if (directDist < 30) {
       cache[mode] = { closeBy: true };
       body.innerHTML = `
@@ -396,16 +396,6 @@ const Directions = (() => {
     }[type]) || '🚌';
   }
 
-  function haversineKm(a, b) {
-    const R = 6371;
-    const toRad = (d) => d * Math.PI / 180;
-    const dLat = toRad(b.lat - a.lat);
-    const dLng = toRad(b.lng - a.lng);
-    const sa = Math.sin(dLat/2) ** 2
-      + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng/2) ** 2;
-    return 2 * R * Math.asin(Math.sqrt(sa));
-  }
-
   function stripHtml(html) {
     if (!html) return '';
     const div = document.createElement('div');
@@ -413,11 +403,7 @@ const Directions = (() => {
     return div.textContent || div.innerText || '';
   }
 
-  function esc(s) {
-    return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-    }[c]));
-  }
+  const esc = Utils.escape;
 
   return { open, close };
 })();
