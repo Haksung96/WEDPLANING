@@ -36,7 +36,13 @@ const Settings = (() => {
 
   function render() {
     const cur = getCurrent();
-    const fb = cur.firebase || {};
+    // Show EFFECTIVE values: localStorage overrides on top of CONFIG defaults.
+    // After domain switch (Netlify → GitHub Pages), localStorage starts empty
+    // but CONFIG still has the hardcoded keys, so the app works — just the
+    // settings UI was misleadingly blank. Now it always shows what's actually
+    // in use, and Save preserves any edits to localStorage.
+    const mapsKey = cur.googleMapsKey || CONFIG.GOOGLE_MAPS_API_KEY || '';
+    const fb = { ...(CONFIG.FIREBASE || {}), ...(cur.firebase || {}) };
     return `
       <div class="section-header">
         <h3>⚙️ 설정</h3>
@@ -48,7 +54,7 @@ const Settings = (() => {
         <p class="setting-hint">
           <a href="https://console.cloud.google.com/google/maps-apis" target="_blank">Google Cloud Console</a>에서 발급. Maps JavaScript API 활성화 필요.
         </p>
-        <input id="set-gmaps" type="text" placeholder="AIzaSy..." value="${esc(cur.googleMapsKey || '')}" />
+        <input id="set-gmaps" type="text" placeholder="AIzaSy..." value="${esc(mapsKey)}" />
       </div>
 
       <div class="settings-card">
