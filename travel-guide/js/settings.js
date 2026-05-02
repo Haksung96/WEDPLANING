@@ -87,6 +87,17 @@ const Settings = (() => {
       </div>
 
       <div class="settings-card">
+        <h4>🔍 Firebase 동기화 진단</h4>
+        <p class="setting-hint">실시간 동기화가 안 될 때 여기서 점검:</p>
+        <div id="sync-diag-summary" class="sync-diag-summary"></div>
+        <div class="settings-buttons">
+          <button id="sync-ping-btn" class="btn-primary">🔌 연결 테스트</button>
+          <button id="sync-refresh-btn" class="btn-secondary">↻ 새로고침</button>
+        </div>
+        <pre id="sync-ping-result" class="sync-ping-result hidden"></pre>
+      </div>
+
+      <div class="settings-card">
         <h4>📡 오프라인 사용 가이드</h4>
         <p class="setting-hint">크루즈에서 데이터 로밍이 비싸거나 끊길 때를 대비해:</p>
         <ul class="offline-tips">
@@ -124,6 +135,7 @@ const Settings = (() => {
     const root = document.getElementById('view-settings');
     if (!root) return;
     root.innerHTML = render();
+    renderDiag();
 
     // Render QR code (free public API - no key required)
     const qrImg = document.getElementById('set-qr-img');
@@ -193,6 +205,62 @@ const Settings = (() => {
       alert('초기화됨. 새로고침합니다.');
       location.reload();
     });
+
+    document.getElementById('sync-ping-btn')?.addEventListener('click', async () => {
+      const btn = document.getElementById('sync-ping-btn');
+      const out = document.getElementById('sync-ping-result');
+      btn.disabled = true;
+      btn.textContent = '🔌 테스트 중...';
+      out.classList.remove('hidden');
+      out.textContent = '연결 시도 중...';
+      try {
+        const result = await Sync.ping();
+        if (result.ok) {
+          out.textContent = `✅ 성공! 왕복 시간 ${result.roundtripMs}ms\n\n` +
+            `테스트 문서가 'trips/${Sync.getUser().tripCode}/_ping/${Sync.getUser().name}' 에 기록됨.\n` +
+            `같은 트립 코드 + 같은 인터넷이면 상대방 폰에서도 즉시 읽힙니다.`;
+        } else {
+          out.textContent = `❌ 실패: ${result.error}\n\n${result.hint || ''}`;
+        }
+      } catch (err) {
+        out.textContent = `❌ 예외: ${err.message}`;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '🔌 연결 테스트';
+        renderDiag();
+      }
+    });
+
+    document.getElementById('sync-refresh-btn')?.addEventListener('click', () => {
+      renderDiag();
+    });
+  }
+
+  function renderDiag() {
+    const el = document.getElementById('sync-diag-summary');
+    if (!el || typeof Sync === 'undefined') return;
+    const d = Sync.getDiagnostics();
+    const fmt = (ts) => ts ? new Date(ts).toLocaleString('ko-KR', { hour12: false }) : '없음';
+    const initLabels = {
+      ok: '✅ 정상', error: '❌ 실패', 'no-config': '⚠️ Firebase 설정 없음', pending: '⏳ 진행 중',
+    };
+    const persistLabels = {
+      ok: '✅ 활성', 'multi-tab': '⚠️ 멀티탭 (1개 탭만)', unsupported: '⚠️ 지원 안 됨', unknown: '?',
+    };
+    el.innerHTML = `
+      <div class="diag-row"><span>모드</span><strong>${d.mode === 'firebase' ? '🔥 Firebase' : '💾 로컬'}</strong></div>
+      <div class="diag-row"><span>이름</span><strong>${esc(d.name)}</strong></div>
+      <div class="diag-row"><span>트립 코드</span><strong>${esc(d.tripCode)}</strong></div>
+      <div class="diag-row"><span>초기화</span><strong>${initLabels[d.initStatus] || d.initStatus}</strong></div>
+      <div class="diag-row"><span>오프라인 캐시</span><strong>${persistLabels[d.persistence] || d.persistence}</strong></div>
+      <div class="diag-row"><span>읽기 횟수</span><strong>${d.readCount}회</strong></div>
+      <div class="diag-row"><span>마지막 읽기</span><strong>${fmt(d.lastReadAt)}</strong></div>
+      <div class="diag-row"><span>쓰기 횟수</span><strong>${d.writeCount}회</strong></div>
+      <div class="diag-row"><span>마지막 쓰기</span><strong>${fmt(d.lastWriteAt)}</strong></div>
+      ${d.lastError ? `<div class="diag-row error"><span>마지막 에러</span><strong>${esc(d.lastError)}</strong></div>` : ''}
+      ${d.initError ? `<div class="diag-row error"><span>초기화 에러</span><strong>${esc(d.initError)}</strong></div>` : ''}
+      <div class="diag-hint">⚠️ 두 폰의 트립 코드가 정확히 같아야 동기화됩니다. 위 코드를 상대방 폰에서도 확인하세요.</div>
+    `;
   }
 
   function val(id) {

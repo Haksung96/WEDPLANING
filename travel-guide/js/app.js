@@ -72,6 +72,22 @@ const App = (() => {
     document.getElementById('login-screen').classList.add('hidden');
     document.getElementById('app').classList.remove('hidden');
 
+    // Make trip code visible in header so both phones can compare at a glance.
+    // Tap to copy/share — useful when partner needs to enter the same code.
+    const tripTag = document.getElementById('trip-code-tag');
+    if (tripTag) {
+      tripTag.textContent = `🔑 ${tripCode}`;
+      tripTag.addEventListener('click', () => {
+        const url = location.origin + location.pathname;
+        const shareText = `우리 트립 코드: ${tripCode}\n앱: ${url}`;
+        if (navigator.share) {
+          navigator.share({ title: '허니문 가이드', text: shareText, url }).catch(() => {});
+        } else {
+          navigator.clipboard.writeText(tripCode).then(() => alert(`트립 코드 ${tripCode} 복사됨`)).catch(() => {});
+        }
+      });
+    }
+
     // Initialize subsystems
     Checklist.init();
     Expenses.init();
