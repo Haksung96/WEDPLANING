@@ -284,9 +284,19 @@ const Directions = (() => {
       : mode === 'TRANSIT' ? 'transit'
       : mode.toLowerCase();
 
-    const gmap = `https://www.google.com/maps/dir/?api=1&destination=${placeQuery}&travelmode=${travelMode}`;
+    // Build the routing URL with both origin (live GPS, if known) and
+    // destination. Including origin avoids 'route not found' errors when
+    // Google has to guess the user's location from cached IP.
+    const userPos = (typeof MapView !== 'undefined' && MapView.getLastPosition)
+      ? MapView.getLastPosition() : null;
+    const originParam = userPos ? `&origin=${userPos.lat},${userPos.lng}` : '';
+    const gmap = `https://www.google.com/maps/dir/?api=1&destination=${placeQuery}${originParam}&travelmode=${travelMode}`;
+    // Plain "show on map" URL — useful when routing fails (e.g. distance
+    // too long for selected mode), user can manually pick mode in Google.
+    const gmapShow = `https://www.google.com/maps/search/?api=1&query=${placeQuery}`;
     const links = [];
     links.push(`<a class="dir-link primary" href="${gmap}" target="_blank">↗️ Google 지도에서 길찾기</a>`);
+    links.push(`<a class="dir-link" href="${gmapShow}" target="_blank">📍 Google 지도에서 위치 보기</a>`);
 
     if (mode === 'TAXI') {
       // Universal taxi/ride-hail deep links — apps detect destination coords.

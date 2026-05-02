@@ -428,19 +428,55 @@ const MapView = (() => {
         const ageNow = Presence.formatAge(partner._updatedAt);
         const distNow = lastPosition ? haversine(lastPosition, pos) : null;
         const distNowStr = distNow == null ? '' : (distNow < 1000 ? `${Math.round(distNow)}m` : `${(distNow/1000).toFixed(1)}km`);
+
+        // Build robust Google Maps URLs:
+        // - Routing URL: include both origin (my GPS) and destination (partner GPS)
+        //   WITHOUT travelmode so Google picks the best mode (도보·대중교통·자동차)
+        //   automatically. Forcing 'walking' fails if distance is too long.
+        // - Show URL: just open the partner's pin in Google Maps so user can
+        //   manually pick the route mode in Google's own UI.
+        const dest = `${pos.lat},${pos.lng}`;
+        const origin = lastPosition ? `&origin=${lastPosition.lat},${lastPosition.lng}` : '';
+        const dirUrl = `https://www.google.com/maps/dir/?api=1&destination=${dest}${origin}`;
+        const showUrl = `https://www.google.com/maps/search/?api=1&query=${dest}`;
+
+        // Internal route panel button (Directions sheet) — pass partner as a
+        // pseudo-location so user gets walk/transit/driving comparison inside the app.
+        const partnerLoc = JSON.stringify({ name: `💑 ${partner.name}`, lat: pos.lat, lng: pos.lng })
+          .replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+
         partnerInfoWindow.setContent(`
-          <div style="padding:8px; min-width:180px;">
+          <div style="padding:8px; min-width:200px;">
             <strong>📍 ${escape(partner.name)}</strong><br/>
             <small>마지막 업데이트: ${escape(ageNow)}</small><br/>
             ${distNowStr ? `<small>나와의 거리: <strong>${escape(distNowStr)}</strong></small><br/>` : ''}
-            <a href="https://www.google.com/maps/dir/?api=1&destination=${pos.lat},${pos.lng}&travelmode=walking"
-               target="_blank"
-               style="display:inline-block; margin-top:6px; font-size:12px; color:#ff6b9d; font-weight:700;">
-              ↗️ 만나러 가기
-            </a>
+            <div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap;">
+              <button data-iw-partner-route='${partnerLoc}'
+                      style="background:#ff6b9d; color:white; border:none; border-radius:14px; padding:6px 12px; font-size:12px; font-weight:700; cursor:pointer;">
+                🚦 경로 보기
+              </button>
+              <a href="${dirUrl}" target="_blank"
+                 style="font-size:12px; color:#ff6b9d; font-weight:700; align-self:center;">
+                ↗️ Google 길찾기
+              </a>
+              <a href="${showUrl}" target="_blank"
+                 style="font-size:12px; color:#666; font-weight:600; align-self:center;">
+                📍 위치만 보기
+              </a>
+            </div>
           </div>
         `);
         partnerInfoWindow.open(map, partnerMarker);
+        google.maps.event.addListenerOnce(partnerInfoWindow, 'domready', () => {
+          const btn = document.querySelector('[data-iw-partner-route]');
+          if (!btn) return;
+          btn.addEventListener('click', () => {
+            try {
+              const loc = JSON.parse(btn.dataset.iwPartnerRoute.replace(/&#39;/g, "'").replace(/&quot;/g, '"'));
+              if (typeof Directions !== 'undefined') Directions.open(loc);
+            } catch (err) { console.warn(err); }
+          });
+        });
       });
     }
 
